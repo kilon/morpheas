@@ -1,7 +1,7 @@
 
 import bpy,blf
 from bgl import *
-from cyclops import png
+import png
 import pdb
 
 class Morph:
