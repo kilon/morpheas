@@ -4,8 +4,8 @@ Morpheas is a Blender GUI API that helps with the construction of custom GUI. It
 # Features
 
 * **Simple structure , easy to learn**. Only 2 methods needed for the functioning of the GUI
-* **Fully documented code**
-* **Single module**. Entire source code contained only in on python source code file
+* **Fully documented code**. Code comments for the entire code.
+* **Single module**. Entire source code contained only in one python source code file
 * **trasnparent or non trasparent custom skins (textures) for any GUI element**
 * **Text with customisable size and font**
 * **Buttons with the ability to change skin when mouse enters or exits them**
