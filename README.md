@@ -21,7 +21,7 @@ Morpheas is a Blender GUI API that helps with the construction of custom GUI. It
 * **Fully Object Orientated** , the library makes no use of globals, precedures or anything else than python classes
 * **Examples**. Morpheas comes with multiple examples also fully documented and it even includes assets used by those examples in the form of a single blender file. Just install Morpheas as a regular Blender addon to demo its features through its examples found in Tools Panel , "Morpheas" tab
 
-#Installation
+# Installation
 Installing is very simple just add morpheas.py to your project and you are ready to use it, all code is included in a single file
 
 You will also need [png.py](https://github.com/drj11/pypng/blob/master/code/png.py) which you can get from code folder of the [github repo of PyPNG project](https://github.com/drj11/pypng)
