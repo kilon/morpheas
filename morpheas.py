@@ -63,64 +63,80 @@ import pdb
 # of assembling almost identical things together with ease and simplicity
 
 class Morph:
-    # global variable for the definition of the default folder where
-    # the PNG files which are used as textures are located
+    """
+    The Morph is extremely essential in Morpheas. It provides the base
+    class that all other morph classes are inherit from. In this class is
+    the most basic functionality of GUI elements that are called
+    "Morphs". Specific functionality is defined on specific subclasses
+    of this class. Morpheas is inspired by Morphic, a GUI that is
+    also based on morphs, approaching GUI creation as a lego like process
+    of assembling almost identical things together with ease and simplicity
+    """
+
+    # Global variable for the definition of the default folder where
+    # the PNG files which are used as textures are located.
     texture_path = "media/graphics/"
 
-    # this is the main suspect, responsible for the creation of the morph, each keyword argument is associated
-    # with an instance variable so see the comment of the relevant instance variable for more information
-    def __init__(self, texture=None, width=100, height=100, position=[0, 0], color=[1.0, 1.0, 1.0, 1.0], name='noname',
+    def __init__(self, texture=None, width=100, height=100, position=[0, 0],
+                 color=[1.0, 1.0, 1.0, 1.0], name='noname',
                  on_left_click_action=None, on_left_click_released_action=None,
                  on_right_click_action=None, on_right_click_released_action=None,
                  on_mouse_in_action=None, on_mouse_out_action=None,
                  texture_path=None, scale=0.5, round_corners=False, round_corners_strength=10):
+        """
+        This is responsible for the creation of the morph, each keyword argument
+        is associated with an instance variable so see the comment of the relevant
+        instance variable for more information.
+        """
 
-        # pdb.set_trace()
+        # If you need explanation for this, I'm worried about you.
         self.width = width
         self.height = height
         self.position = position
 
-        # one may ask why color in a morph with a texture. None the less color can affect not only the color of the
-        # active texture but also its transparency . Color is a list of floats following the RGBA ( red, green, blue
+        # If no texture is defined, then this is the color of the morph.
+        # Else, this affects the color and transparency of the texture.
+        # Color is a list of floats following the RGBA: red, green, blue
         # and alpha (transparency). [ r , g , b, alpha ]
         self.color = color
 
-        # essentially these variables enable and disable the handling of specific events. If events are disabled
-        # they are ignored by this morph but they do pass to its children. If none handles them as well, the event
-        # is passed back to Blender through world's consumed_event instance variable. For more info about this , see
-        # World comments
+        # Essentially these variables enable and disable the handling of specific events.
+        # If events are disabled they are ignored by this morph but they do
+        # pass to its children. If none handles them as well, the event
+        # is passed back to Blender through world's consumed_event instance variable.
+        # For more info about this, see World comments.
         self.handles_mouse_down = False
         self.handles_events = False
         self.handles_mouse_over = False
 
-        # these is are the positions of the 4 corners of the boundaries of the morph
+        # These is are the positions of the 4 corners of the boundaries of the morph.
         self.bounds = [self.position[0], self.position[1], self.position[0] + self.width,
                        self.position[1] + self.height]
 
         self._is_hidden = False
 
-        # a morph can be inside another morph. That other morph is the parent while this morph becomes the child
+        # A morph can be inside another morph.
+        # That other morph is the parent while this morph becomes the child.
         self._parent = None
         self.children = []
 
-        # a world is essentially a parent without a parent. World is a morph responsible for
+        # A world is essentially a parent without a parent. World is a morph responsible for
         # anything that is not morph specific and general functionalities like figuring out
-        # where the mouse is and what region draws at the time
+        # where the mouse is and what region draws at the time.
         self._world = None
 
-        # a name is an optional feature for when you want to locate a specific morph inside a world
-        # and do something to it or do something with it
+        # A name is an optional feature for when you want to locate a specific morph inside a world
+        # and do something to or with it.
         self.name = name
 
-        # this counts the amount of times the morph has been drawn. Can be useful to figure out FPS
-        # and make sure Morpheas does not slow down Blender
+        # This counts the amount of times the morph has been drawn. Can be useful to figure out FPS
+        # and make sure Morpheas does not slow down Blender.
         self.draw_count = 0
 
-        # though only one texture can display at time , a morph can have multiple textures
+        # Though only one texture can display at time, a morph can have multiple textures.
         self.textures = {}
 
-        # a morph can be scaled like any blender object. The scale is also tied to the scale of the active texture
-        # the scale of the active texture depends on the dimensions of the png file
+        # A morph can be scaled like any blender object.
         self.scale = scale
 
         # To be used only if no texture is given. The drawn rectangle will have round edges.
@@ -130,15 +146,16 @@ class Morph:
         # Only used if round_corners is True and no texture is given.
         self.round_corners_strength = round_corners_strength
 
-        # this tells where to find the textures
+        # This is the path to the textures.
         if texture_path is None:
             self.texture_path = Morph.texture_path
         else:
             self.texture_path = texture_path
 
-        # active texture is the texture displaying at the time
-        # only one texture can display at a time , if you want more then you have to have multiple child morphs
-        # each child will have its own active texture
+        # Active texture is the texture displaying at the time.
+        # Only one texture can display at a time for each morph,
+        # if you want more then you have to have multiple child morphs.
+        # Each child will have its own active texture.
         self.active_texture = texture
 
         # these are actions which are basically simple python objects that contain an appropriate method
