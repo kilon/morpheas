@@ -47,9 +47,10 @@
 # ================================================================
 
 
-import bpy, blf
+import bpy
+import blf
 from bgl import *
-from . import png
+from . import png, morpheas_tools
 import pdb
 
 
@@ -72,7 +73,7 @@ class Morph:
                  on_left_click_action=None, on_left_click_released_action=None,
                  on_right_click_action=None, on_right_click_released_action=None,
                  on_mouse_in_action=None, on_mouse_out_action=None,
-                 texture_path=None, scale=0.5):
+                 texture_path=None, scale=0.5, round_corners=False, round_corners_strength=10):
 
         # pdb.set_trace()
         self.width = width
@@ -122,6 +123,13 @@ class Morph:
         # the scale of the active texture depends on the dimensions of the png file
         self.scale = scale
 
+        # To be used only if no texture is given. The drawn rectangle will have round edges.
+        self.round_corners = round_corners
+
+        # Defines how much should the corners be rounded. Higher values give more rounded results.
+        # Only used if round_corners is True and no texture is given.
+        self.round_corners_strength = round_corners_strength
+
         # this tells where to find the textures
         if texture_path is None:
             self.texture_path = Morph.texture_path
@@ -162,7 +170,6 @@ class Morph:
         else:
             self.load_texture(name)
 
-
     # this is an internal method not to be used directly by the user
     # it loads the texture, the actual displaying is handled by the
     # draw() method
@@ -172,15 +179,16 @@ class Morph:
     # 1 being texture at full size
     def load_texture(self, name, scale=0.5):
 
-        # detect the current location of the addon using Morpheas
-        current_path = __file__[0:-11]
-        bpy.path.basename(current_path)
-        # create the full path of the texture to be loaded and load it
-        full_path = current_path + self.texture_path + name + '.png'
+       # Create the full path of the texture to be loaded and load it
+        full_path = self.texture_path + name
         f = png.Reader(full_path)
         f.read()
-        f = f.asFloat()
+        f = f.asRGBA()
+
+        # Kind of necessary unfortunately, as there is a problems with images
+        # without alpha layer
         content = list(f[2])
+        content = morpheas_tools.convertColorValuesToFloat(content)
 
         buf = Buffer(GL_FLOAT, [len(content), len(content[0])], content)
         # a Morph can have multiple textures if it is needed, the information
@@ -195,8 +203,6 @@ class Morph:
     # one texture can be active at the time in order to display on screen
     def activate_texture(self, name):
         self.active_texture = name
-        self.width = round(self.textures[name]['dimensions'][0] * self.textures[name]['scale'])
-        self.height = round(self.textures[name]['dimensions'][1] * self.textures[name]['scale'])
         self.scale = self.textures[name]['scale']
 
     # the main draw function
@@ -214,8 +220,10 @@ class Morph:
                 glBindTexture(GL_TEXTURE_2D, at['texture_id'].to_list()[0])
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, at['dimensions'][0], at['dimensions'][1], 0, GL_RGBA, GL_FLOAT,
                              at['data'])
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+                glTexParameteri(
+                    GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+                glTexParameteri(
+                    GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
                 at['is_gl_initialised'] = True
             else:
                 glBindTexture(GL_TEXTURE_2D, at['texture_id'].to_list()[0])
@@ -231,7 +239,8 @@ class Morph:
             glTexCoord2f(1, 1)
             glVertex2f((self.position[0] + self.width), self.position[1])
             glTexCoord2f(1, 0)
-            glVertex2f((self.position[0] + self.width), (self.position[1] + self.height))
+            glVertex2f((self.position[0] + self.width),
+                       (self.position[1] + self.height))
             glTexCoord2f(0, 0)
             glVertex2f(self.position[0], (self.position[1] + self.height))
 
@@ -240,12 +249,22 @@ class Morph:
             glDisable(GL_TEXTURE_2D)
             glDisable(GL_BLEND)
 
+        # In this case draw a rectangle
+        elif (not self.is_hidden) and (len(self.textures) == 0):
+            if self.round_corners:
+                outline = morpheas_tools.roundCorners(self.position[0], self.position[1],
+                                                      self.width, self.height, self.round_corners_strength,
+                                                      self.round_corners_strength, [True, True, True, True])
+            else:
+                outline = morpheas_tools.roundCorners(self.position[0], self.position[1],
+                                                      self.width, self.height, 10, 10, [False, False, False, False])
+
+            morpheas_tools.drawRegion('GL_POLYGON', outline, self.color)
+
         if (not self.is_hidden) and len(self.children) > 0:
 
             for child_morph in self.children:
                 child_morph.draw(context)
-
-
 
     # every Morph belongs to a World which is another Morph
     # acting as a general manager of the behavior of Morphs
@@ -320,6 +339,15 @@ class Morph:
                 return child
             else:
                 child.get_child_morph_named(name)
+        return None
+
+    # Returns the index of a morph in the children list, useful for deleting the morph
+    def get_child_morph_named_index(self, name):
+        index = 0
+        for child in self.children:
+            if child.name == name:
+                return index
+            index += 1
         return None
 
     # upper left corner of the bounding box
@@ -497,7 +525,7 @@ class World(Morph):
 
         # This feature hides the World on regions that the mouse is on top of
         # so it depends on self.mouse_cursor_inside
-        self.auto_hide = True
+        self.auto_hide = False
 
     # position with coordinates that start [0,0] at the bottom of the entire Blender window
     # (not to be confused with Blender's own internal windows)
@@ -520,17 +548,18 @@ class World(Morph):
 
         mx = self.mouse_position[0]
         my = self.mouse_position[1]
-        self.mouse_position_absolute = [mx + self.window_position[0], my + self.window_position[1]]
+        self.mouse_position_absolute = [
+            mx + self.window_position[0], my + self.window_position[1]]
         mabx = self.mouse_position_absolute[0]
         maby = self.mouse_position_absolute[1]
         self.mouse_cursor_inside = (
-        (mabx > self.draw_area_position[0]) and (mabx < (self.draw_area_position[0] + self.draw_area_width)) and (
-        maby > self.draw_area_position[1]) and (maby < (self.draw_area_position[1] + self.draw_area_height)))
+            (mabx > self.draw_area_position[0]) and (mabx < (self.draw_area_position[0] + self.draw_area_width)) and (
+                maby > self.draw_area_position[1]) and (maby < (self.draw_area_position[1] + self.draw_area_height)))
 
         # if auto_hide is enabled , draw my Morphs ONLY if the mouse is located inside the area
         # that draws at the time
         if (
-                    self.mouse_cursor_inside and self.auto_hide and context.area.type == "VIEW_3D" and context.region.type == "WINDOW") or not self.auto_hide:
+                self.mouse_cursor_inside and self.auto_hide and context.area.type == "VIEW_3D" and context.region.type == "WINDOW") or not self.auto_hide:
             self.draw_area_context = context
             for child in self.children:
                 child.draw(context)
@@ -636,18 +665,3 @@ class ButtonMorph(Morph):
             self.color = (1.0, 1.0, 1.0, 0.5)
         if value == 1:
             self.color = (self.color[0], self.color[1], self.color[2], 1.0)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
