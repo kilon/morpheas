@@ -54,14 +54,6 @@ from . import png, morpheas_tools
 import pdb
 
 
-# The Morph is extremely essential in Morpheas. It provides the base
-# class that all other morph classes are inherit from. In this class is
-# the most basic functionality of GUI elements that are called
-# "Morphs". Specific functionality is defined on specific subclasses
-# of this class. Morpheas is inspired by Morphic, a GUI that is
-# also based on morphs, approaching GUI creation as a lego like process
-# of assembling almost identical things together with ease and simplicity
-
 class Morph:
     """
     The Morph is extremely essential in Morpheas. It provides the base
@@ -82,7 +74,8 @@ class Morph:
                  on_left_click_action=None, on_left_click_released_action=None,
                  on_right_click_action=None, on_right_click_released_action=None,
                  on_mouse_in_action=None, on_mouse_out_action=None,
-                 texture_path=None, scale=0.5, round_corners=False, round_corners_strength=10):
+                 texture_path=None, scale=0.5, round_corners=False,
+                 round_corners_strength=10, round_corners_select=[True, True, True, True]):
         """
         This is responsible for the creation of the morph, each keyword argument
         is associated with an instance variable so see the comment of the relevant
@@ -146,6 +139,11 @@ class Morph:
         # Only used if round_corners is True and no texture is given.
         self.round_corners_strength = round_corners_strength
 
+        # Defines which corners to round if round_corners is true. The order is
+        # [upper_left, upper_right, down_right, down_left]. Default behaviour is
+        # to round all of them.
+        self.round_corners_select = round_corners_select
+
         # This is the path to the textures.
         if texture_path is None:
             self.texture_path = Morph.texture_path
@@ -158,9 +156,11 @@ class Morph:
         # Each child will have its own active texture.
         self.active_texture = texture
 
-        # these are actions which are basically simple python objects that contain an appropriate method
-        # like on_left_click or on_right_click. This allows us to keep as MVC model that has the handling of
-        # events seperate from Morpheas and for the user to define his own actions without having to subclass Morph
+        # These are actions which are basically simple python objects
+        # that contain an appropriate method like on_left_click or on_right_click.
+        # This allows us to keep as MVC model that has the handling of
+        # events seperate from Morpheas and for the user to define his
+        # own actions without having to subclass Morph.
         self.on_left_click_action = on_left_click_action
         self.on_left_click_released_action = on_left_click_released_action
         self.on_right_click_action = on_right_click_action
@@ -168,20 +168,25 @@ class Morph:
         self.on_mouse_in_action = on_mouse_in_action
         self.on_mouse_out_action = on_mouse_out_action
 
+        # Load the texture to be shown if a texture is given.
         if texture is not None:
             self.load_texture(self.active_texture, self.scale)
 
-    # the easiest way to change the texture of the morph is to use the self.texture attribute
-    # here Morpheas will return always the active texture when you read the variable
     @property
     def texture(self):
+        """
+        The easiest way to change the texture of the morph is to use the self.texture attribute.
+        Here, Morpheas will return always the active texture when you read the variable.
+        """
         return self.active_texture
 
-    # if you try to set the variable and the texture is not part of the list of textures
-    # morph has available , it loads the texture (Adding it to the list of textures)
-    #  and makes it active. If it is available it just makes it active.
     @texture.setter
     def texture(self, name):
+        """
+        If you try to set the variable and the texture is not part of the list of textures
+        the morph has available, it loads the texture(adding it to the list of textures)
+        and makes it active. If it is available it just makes it active.
+        """
         if name in self.textures:
             self.activate_texture(name)
         else:
@@ -195,21 +200,31 @@ class Morph:
     # scale: it allows to scale the texture
     # 1 being texture at full size
     def load_texture(self, name, scale=0.5):
+        """
+        This is an internal method not to be used directly by the user.
+        It loads the texture, while the actual displaying is handled by the
+        draw() method.
+        name:
+            Is the same as texture and is the name of the PNG file without the extension.
+        scale:
+            It allows to scale the texture, 1.0 being the full size.
+        """
 
-       # Create the full path of the texture to be loaded and load it
+        # Create the full path of the texture to be loaded and load it.
         full_path = self.texture_path + name
         f = png.Reader(full_path)
         f.read()
         f = f.asRGBA()
 
         # Kind of necessary unfortunately, as there is a problems with images
-        # without alpha layer
+        # without alpha layer.
         content = list(f[2])
         content = morpheas_tools.convertColorValuesToFloat(content)
 
         buf = Buffer(GL_FLOAT, [len(content), len(content[0])], content)
-        # a Morph can have multiple textures if it is needed, the information
-        # about those textures are fetched directly from the PNG file
+
+        # A Morph can have multiple textures if it is needed, the information
+        # about those textures are fetched directly from the PNG file.
         self.textures[name] = {'dimensions': [f[3]['size'][0], f[3]['size'][1]],
                                'full_path': full_path, 'data': buf,
                                'is_gl_initialised': False, 'scale': scale, 'texture_id': 0}
@@ -217,20 +232,25 @@ class Morph:
         self.activate_texture(name)
         return self.textures[name]
 
-    # one texture can be active at the time in order to display on screen
     def activate_texture(self, name):
+        """
+        One texture can be active at a time in order to display on screen.
+        """
         self.active_texture = name
         self.scale = self.textures[name]['scale']
 
-    # the main draw function
     def draw(self, context):
+        """
+        The main draw function. Kind of a nightmare to figure out...
+        """
 
+        # If the morph is not hidden and a texture is given.
         if (not self.is_hidden) and (not len(self.textures) == 0):
             self.draw_count = self.draw_count + 1
 
             at = self.textures[self.active_texture]
 
-            # load the active texture to the OpenGL context
+            # Load the active texture to the OpenGL context.
             if not at['is_gl_initialised']:
                 at['texture_id'] = Buffer(GL_INT, [1])
                 glGenTextures(1, at['texture_id'])
@@ -246,8 +266,9 @@ class Morph:
                 glBindTexture(GL_TEXTURE_2D, at['texture_id'].to_list()[0])
 
             glColor4f(*self.color)
-            # draw a simple rectangle with the dimensions, position and scale of the Morph
-            # use the active texture as texture of the rectangle
+
+            # Draw a simple rectangle with the dimensions, position and scale of the Morph.
+            # Use the active texture as texture of the rectangle.
             glEnable(GL_BLEND)
             glEnable(GL_TEXTURE_2D)
             glBegin(GL_QUADS)
@@ -261,32 +282,38 @@ class Morph:
             glTexCoord2f(0, 0)
             glVertex2f(self.position[0], (self.position[1] + self.height))
 
-            # restore OpenGL context to avoide any conflicts
+            # Restore OpenGL context to avoide any conflicts.
             glEnd()
             glDisable(GL_TEXTURE_2D)
             glDisable(GL_BLEND)
 
-        # In this case draw a rectangle
+        # If morph is not hidden and no texture is given, create a simple rectangle,
+        # with the option to have rounded corners.
         elif (not self.is_hidden) and (len(self.textures) == 0):
             if self.round_corners:
-                outline = morpheas_tools.roundCorners(self.position[0], self.position[1],
-                                                      self.width, self.height, self.round_corners_strength,
-                                                      self.round_corners_strength, [True, True, True, True])
+                outline = morpheas_tools.roundCorners(
+                    self.position[0], self.position[1],
+                    self.width, self.height, self.round_corners_strength,
+                    self.round_corners_strength, self.round_corners_select)
             else:
-                outline = morpheas_tools.roundCorners(self.position[0], self.position[1],
-                                                      self.width, self.height, 10, 10, [False, False, False, False])
+                outline = morpheas_tools.roundCorners(
+                    self.position[0], self.position[1],
+                    self.width, self.height, 10, 10, [False, False, False, False])
 
             morpheas_tools.drawRegion('GL_POLYGON', outline, self.color)
 
+        # If morph is not hidden, also draw all its children.
         if (not self.is_hidden) and len(self.children) > 0:
-
             for child_morph in self.children:
                 child_morph.draw(context)
 
-    # every Morph belongs to a World which is another Morph
-    # acting as a general manager of the behavior of Morphs
     @property
     def world(self):
+        """
+        Return Morph's World.
+        Every Morph belongs to a World which is another Morph
+        acting as a general manager of the behavior of Morphs.
+        """
 
         if self._world is None and self._parent is not None:
             self._world = self.parent.world
@@ -296,12 +323,14 @@ class Morph:
     def world(self, value):
         self._world = value
 
-    # a Morph can contain another Morph, if so each morph it contains
-    # is called a "child" and for each child it is the parent
     @property
     def parent(self):
-
-        if self._parent == None and self._world != None:
+        """
+        Return Morph's parent.
+        A Morph can contain another Morph. If so, each morph it contains
+        is called a "child" and for each child it is it's parent.
+        """
+        if self._parent is None and self._world is not None:
             self._parent = self.world
         return self._parent
 
