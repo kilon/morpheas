@@ -46,6 +46,10 @@
 #################################################################
 # ================================================================
 
+"""
+This is the basic Morpheas file. Here you will find all the necessary
+classes for this library to work.
+"""
 
 import bpy
 import blf
@@ -314,7 +318,6 @@ class Morph:
         Every Morph belongs to a World which is another Morph
         acting as a general manager of the behavior of Morphs.
         """
-
         if self._world is None and self._parent is not None:
             self._world = self.parent.world
         return self._world
@@ -340,20 +343,25 @@ class Morph:
 
     @property
     def is_hidden(self):
+        """
+        Check is Morph is hidden.
+        """
         return self._is_hidden
 
     @is_hidden.setter
     def is_hidden(self, value):
         for morph in self.children:
-            if morph._is_hidden != value:
+            if morph.is_hidden != value:
                 morph.is_hidden = value
         self._is_hidden = value
 
-    # Morpheas uses relative position coordinates. Those are the position of Morph added to the position
-    # of the parent and of course of the World. This method gets the actual position inside the Blender
-    # Window that Morphs are drawn and all other Blender GUI
     def get_absolute_position(self):
-
+        """
+        Morpheas uses relative position coordinates. Those are the position
+        of Morph added to the position of the parent and of course of the World.
+        This method gets the actual position inside the Blender
+        Window that Morphs are drawn in.
+        """
         if self.parent is not None:
             return (self.parent.get_absolute_position()[0] + self.position[0],
                     self.parent.get_absolute_position()[1] + self.position[1])
@@ -361,8 +369,10 @@ class Morph:
         else:
             return self.position
 
-    # add the Morph as a child to another Morph, the other Morph becomes the parent
     def add_morph(self, morph):
+        """
+        Add the Morph as a child to another Morph, the other Morph becomes its parent.
+        """
 
         morph.parent = self
         morph.world = self.world
@@ -377,9 +387,10 @@ class Morph:
         if self.bounds[3] < morph.bounds[3]:
             self.bounds[3] = morph.bounds[3]
 
-    # returns a child morph of a specific name of course this depend on the definition
-    # of a name at the creation of Morph or after
     def get_child_morph_named(self, name):
+        """
+        Returns a child morph of a specific name.
+        """
         for child in self.children:
             if child.name == name:
                 return child
@@ -387,8 +398,11 @@ class Morph:
                 child.get_child_morph_named(name)
         return None
 
-    # Returns the index of a morph in the children list, useful for deleting the morph
     def get_child_morph_named_index(self, name):
+        """
+        Returns the index of a morph in the children list,
+        useful for deleting the morph.
+        """
         index = 0
         for child in self.children:
             if child.name == name:
@@ -396,27 +410,41 @@ class Morph:
             index += 1
         return None
 
-    # upper left corner of the bounding box
+    # Upper left and lower right corners of the bounding box,
+    # defining the area occupied by the morph.
+
     def x(self):
+        """
+        x value of upper left corner of the bounding box.
+        """
         return self.position[0]
 
     def y(self):
+        """
+        y value of upper left corner of the bounding box.
+        """
         return self.position[1]
 
-        # lower right corner of the bounting box, defining the area occupied by the morph
-
     def x2(self):
+        """
+        x value of lower right corner of the bounding box.
+        """
         return self.x() + self.width
 
     def y2(self):
+        """
+        y value of lower right corner of the bounding box.
+        """
         return self.y() + self.height
 
-    # This is also an internal method called by the World morph, that acts as the general
-    # mechanism for figuring out the type event it received and sending it to the appropriate
-    # specialised method. Generally this should not be overridden by your classes unless you
-    # want to override the general event behavior of the morph. For specific event override the
-    # relevant methods instead.
     def on_event(self, event, context):
+        """
+        This is also an internal method called by the World morph, that acts as the general
+        mechanism for figuring out the type event it received and sending it to the appropriate
+        specialised method. Generally this should not be overridden by your classes unless you
+        want to override the general event behavior of the morph. For specific event override,
+        call the relevant methods instead.
+        """
 
         if self.handles_events and not self.is_hidden:
             if event.type in {'LEFTMOUSE', 'RIGHTMOUSE'}:
@@ -427,8 +455,10 @@ class Morph:
             for morph in self.children:
                 morph.on_event(event, context)
 
-    # an event when any mouse button is pressed or released
     def on_mouse_down(self, event):
+        """
+        An event when any mouse button is pressed or released.
+        """
 
         apx1 = self.get_absolute_position()[0]
         apy1 = self.get_absolute_position()[1]
@@ -449,8 +479,10 @@ class Morph:
                 if event.type == 'RIGHTMOUSE' and event.value == 'RELEASE':
                     self.on_right_click_released()
 
-    # an event when the mouse cursor passes over the area occupied by the morph
     def on_mouse_over(self, event):
+        """
+        An event when the mouse cursor passes over the area occupied by the morph.
+        """
 
         apx1 = self.get_absolute_position()[0]
         apy1 = self.get_absolute_position()[1]
@@ -463,8 +495,11 @@ class Morph:
         else:
             return self.on_mouse_out()
 
-    # the following methods should be self explanatory and depend on the action classes passed to the
-    # morph. These are also the methods to override if you want to treat specifc events differently inside your morph
+    # The following methods should be self explanatory and
+    # depend on the action classes passed to the morph.
+    # These are also the methods to override if you want to
+    # treat specifc events differently inside your morph.
+
     def on_left_click(self):
         if self.on_left_click_action is not None:
             return self.on_left_click_action.on_left_click(self)
@@ -489,80 +524,93 @@ class Morph:
         else:
             return self.world.event
 
-    # an event for when the mouse enters the area of the Morph
     def on_mouse_in(self):
+        """
+        An event for when the mouse enters the area of the Morph.
+        """
         if self.on_mouse_in_action is not None:
             return self.on_mouse_in_action.on_mouse_in(self)
         else:
             return self.world.event
 
-    # an event for when the mouse exits the area of the Morph
     def on_mouse_out(self):
+        """
+        An event for when the mouse exits the area of the Morph.
+        """
         if self.on_mouse_out_action is not None:
             return self.on_mouse_out_action.on_mouse_in(self)
         else:
             return self.world.event
 
 
-# World morph is a simple morph that triggers and handles the drawing methods and event methods
-# for each child morph. In order for a morph to be a child of a World it has to be added to it or
-# else it wont display. There can be more than one world. Generally this is not necessary if you want
-# to create a multi layer interfaces because each morph can act as a container (parent) to other morphs (children)
-# On the other hand there are cases when you want each layer to be really separate and with its own handling of events
-# and drawing which make sense to have multiple worlds. The choice is up to you but remember you have to call draw
-# and on_event methods for each world you have if you want that world to display and handle events for its children
-# morphs.A world requires a modal operator , because only Blender's modal operators are the recommended way for handling
-# Blender events and drawing on regions of internal Blender windows. As such the draw() method must be called inside the
-# method associated with the modal's drawing and on_event is called on the modal method of your modal operator.
-# You need to call only those two methods for Morpheas to work of course taking into account you have already
-# created a world , creted the morphs and added the morphs to the world via add_morph method.
 class World(Morph):
+    """
+    World morph is a simple morph that triggers and handles the drawing methods and event methods
+    for each child morph. In order for a morph to be a child of a World it has to be added to it or
+    else it won't display. There can be more than one world.
+    Generally this is not necessary if you want to create a multi layer interfaces because each
+    morph can act as a container (parent) to other morphs (children).
+    On the other hand there are cases when you want each layer to be really separate and with
+    its own handling of events and drawing which make sense to have multiple worlds.
+    The choice is up to you but remember you have to call draw and on_event methods for each
+    world you have if you want that world to display and handle events for its children morphs.
+    A world requires a modal operator, because only Blender's modal operators are the recommended
+    way for handling Blender events and drawing on regions of internal Blender windows.
+    As such the draw() method must be called inside the method associated with the modal's drawing
+    and on_event is called on the modal method of your modal operator.
+    You need to call only those two methods for Morpheas to work.
+    Of course it's taking into account you have already created a world, then the morphs and added
+    them to the world via add_morph method.
+    """
+
     def __init__(self, **kargs):
 
         super().__init__(**kargs)
 
-        # this defines whether the event send to World's onEvent method
+        # This defines whether the event send to World's onEvent method
         # has been handled by any morph. If it has not , you can use this variable
         # to make sure your modal method returns {"PASS_THROUGH"} so that the event
-        # is passed back to Blender and you don't block user interaction
+        # is passed back to Blender and you don't block user interaction.
         self.consumed_event = False
 
-        # the modal operator that uses this World
+        # The modal operator that uses this World.
         self.modal_operator = 0
 
-        # the coordinates of the mouse cursor, its the same as blender mouse coordinates
+        # The coordinates of the mouse cursor, its the same as blender mouse coordinates
         # of the WINDOW region of the internal window that has been assigned the modal
         # operator needed to draw and send events to Morpheas. Blender does not change that
-        # window, so the mouse coordinates start [0,0] does not change as well
+        # window, so the mouse coordinates starting [0,0] does not change as well.
         self.mouse_position = [0, 0]
 
-        # the absolute coordinates are different in that they do not start from the bottomn left
-        # corner of the region assigned the handling of event by Blender bur rather
-        # they are located at the bottom left corner of the Blender window
-        # this is necessary when Morpheas draws in regions not associated by Blender with handling
-        # of events to figure out exactly where the mouse is located inside the entire Blender window
+        # The absolute coordinates are different in that they don't start from the bottomn left
+        # corner of the region assigned the handling of event by Blender, but rather
+        # they are located at the bottom left corner of the Blender window.
+        # This is necessary when Morpheas draws in regions not associated
+        # by Blender with handling of events to figure out exactly where the
+        # mouse is located inside the entire Blender window.
         self.mouse_position_absolute = [0, 0]
 
-        # whether mouse is inside a region that is drawing at the time
-        # this is used for auto_hide feature
+        # When mouse is inside a region that is drawing at the time
+        # this is used for auto_hide feature.
         self.mouse_cursor_inside = False
 
-        # window here is the region that is associated with the handling of events and it does not change
-        # this is defined by Blender. Morpheas itself gives any region that calls the on_event method
-        # the ability to handle events through the World morph. Generally this should not concern you
-        # because it happens automatically and does not require any additional information.
+        # Window here is the region that is associated with the handling of events
+        # and it does not change, as this is defined by Blender. Morpheas itself gives any region
+        # that calls the on_event method the ability to handle events through the World morph.
+        # Generally, this should not concern you because it happens
+        # automatically and does not require any additional information.
         self.window_position = [0, 0]
         self.window_width = 300
         self.window_height = 300
 
-        # the blender event as it is
+        # The blender event as it is.
         self.event = None
 
-        # draw area is the region at that particular time that draws the world
-        # even though in blender only one region is responsible with event handling
-        # for Morpheas any other region can draw graphics and receive events as well
-        # this is useful when you replicate the same internal window for example when
-        # you have opened multiple 3d views
+        # Draw area is the region at that particular time that draws the world.
+        # Even though in blender only one region is responsible with event handling,
+        # for Morpheas any other region can draw graphics and receive events as well.
+        # This is useful when you replicate the same internal window, for example when
+        # you have opened multiple 3d views.
         self.draw_area = None
         self.draw_area_position = [0, 0]
         self.draw_area_width = 300
@@ -570,24 +618,30 @@ class World(Morph):
         self.draw_area_context = None
 
         # This feature hides the World on regions that the mouse is on top of
-        # so it depends on self.mouse_cursor_inside
+        # so it depends on self.mouse_cursor_inside.
         self.auto_hide = False
 
-    # position with coordinates that start [0,0] at the bottom of the entire Blender window
-    # (not to be confused with Blender's own internal windows)
     def get_absolute_position(self):
-        return [self.position[0] + self.draw_area_position[0], self.position[1] + self.draw_area_position[1]]
+        """
+        Position with coordinates that start [0,0] at the bottom of the entire Blender window
+        (not to be confused with Blender's own internal windows).
+        """
+        return [self.position[0] + self.draw_area_position[0],
+                self.position[1] + self.draw_area_position[1]]
 
-    # World draw depends on Morph draw, what it does additionally is the auto_hide feature
     def draw(self, context):
-        # Use OpenGL to get the size of the region we can draw without overlapping with other areas
+        """
+        World draw depends on Morph draw, what it does additionally is the auto_hide feature.
+        """
+
+        # Use OpenGL to get the size of the region we can draw without overlapping with other areas.
         mybuffer = Buffer(GL_INT, 4)
         glGetIntegerv(GL_VIEWPORT, mybuffer)
         draw_area_old = self.draw_area
         self.draw_area = mybuffer
 
-        # from that extract information about the region and
-        # assign it to relevant instance variables
+        # From that extract information about the region and
+        # assign it to relevant instance variables.
         self.draw_area_position = [mybuffer[0], mybuffer[1]]
         self.draw_area_width = mybuffer[2]
         self.draw_area_height = mybuffer[3]
@@ -599,19 +653,23 @@ class World(Morph):
         mabx = self.mouse_position_absolute[0]
         maby = self.mouse_position_absolute[1]
         self.mouse_cursor_inside = (
-            (mabx > self.draw_area_position[0]) and (mabx < (self.draw_area_position[0] + self.draw_area_width)) and (
-                maby > self.draw_area_position[1]) and (maby < (self.draw_area_position[1] + self.draw_area_height)))
+            (mabx > self.draw_area_position[0])
+            and (mabx < (self.draw_area_position[0] + self.draw_area_width)) and (
+                maby > self.draw_area_position[1])
+            and (maby < (self.draw_area_position[1] + self.draw_area_height)))
 
-        # if auto_hide is enabled , draw my Morphs ONLY if the mouse is located inside the area
-        # that draws at the time
-        if (
-                self.mouse_cursor_inside and self.auto_hide and context.area.type == "VIEW_3D" and context.region.type == "WINDOW") or not self.auto_hide:
+        # If auto_hide is enabled, draw my Morphs ONLY if the mouse is located inside the area
+        # that draws at the time.
+        if (self.mouse_cursor_inside and self.auto_hide
+                and context.area.type == "VIEW_3D"
+                and context.region.type == "WINDOW") or not self.auto_hide:
             self.draw_area_context = context
             for child in self.children:
                 child.draw(context)
                 # context.area.tag_redraw()
         else:
-            # if it is not, reset the information about the region back to previous region as the active region
+            # If it is not, reset the information about the region back
+            # to previous region as the active region.
             if draw_area_old is not None:
                 mybuffer = draw_area_old
                 self.draw_area = mybuffer
@@ -619,10 +677,11 @@ class World(Morph):
                 self.draw_area_width = mybuffer[2]
                 self.draw_area_height = mybuffer[3]
 
-    # a world cannot have a world by itself and of course not a parent
-    # this is why we override the Morph add_morph method
     def add_morph(self, morph):
-
+        """
+        A world cannot have a world by itself and of course neither a parent.
+        This is why we override the Morph add_morph method.
+        """
         morph.parent = self
         morph.world = self
         self.children.append(morph)
@@ -636,10 +695,12 @@ class World(Morph):
         if self.bounds[3] < morph.bounds[3]:
             self.bounds[3] = morph.bounds[3]
 
-    # again this depends on Morph on_event
-    # Here we automatically set up information about which region has been
-    # assigned by Blender to handle events
     def on_event(self, event, context):
+        """
+        Again this depends on Morph on_event.
+        Here we automatically set up information about which region has been
+        assigned by Blender to handle events.
+        """
 
         x1 = context.region.x
         y1 = context.region.y
@@ -651,22 +712,24 @@ class World(Morph):
         self.mouse_position = [event.mouse_region_x, event.mouse_region_y]
         self.event = event
 
-        # consume_event is reset so World does not block events that are not handled by it
-        # instead those events are passed back to Blender through the {'PASS_THROUGH'} return
+        # consumed_event is reset so World does not block events that are not handled by it.
+        # Instead, those events are passed back to Blender through the {'PASS_THROUGH'} return,
         # so you need to check out this variable and if it is False you need to make sure
-        # the modal method of your modal operator (needed for Morpheas to work)
-        # returns {'PASS_THROUGH'} if you want your user to interact with
-        # a Morpheas GUI and Blender at the same time or else you will have an angry user hunting you down in forums
-
+        # the modal method of your modal operator(needed for Morpheas to work)
+        # returns {'PASS_THROUGH'}, if you want your user to interact with a Morpheas GUI and
+        # Blender at the same time, or else you will have an angry user hunting you down in forums.
+        # That's why we always have good excuses, like university exams or work...
         self.consumed_event = False
 
         for morph in self.children:
             morph.on_event(event, context)
 
 
-# StringMorph is a class that defines a simple label , a piece of text of any size
-# size: is the size of the font
 class TextMorph(Morph):
+    """
+    TextMorph is a class that defines a simple label, a piece of text of any size.
+    """
+
     def __init__(self, font_id=0, text="empty string", x=15, y=0, size=16, dpi=72, **kargs):
         self.position = [x, y]
         super().__init__(texture=None, **kargs)
@@ -676,25 +739,29 @@ class TextMorph(Morph):
         self.font_id = 0
 
     def draw(self, context):
-        if (not self.is_hidden):
+        if not self.is_hidden:
             glColor4f(*self.color)
             blf.size(self.font_id, self.size, self.dpi)
             blf.position(self.font_id, self.position[0], self.position[1], 0)
             blf.draw(self.font_id, self.text)
 
 
-# a ButtonMorph is a morph that responds to an action. This is a default
-# behavior for morphs, however ButtonMorph makes it a bit easier and provides
-# an easy way to change the morph appearance when the mouse is hovering over
-# the button
 class ButtonMorph(Morph):
+    """
+    A ButtonMorph is a morph that responds to an action. This is a default
+    behavior for morphs, however ButtonMorph makes it a bit easier and provides
+    an easy way to change the morph appearance when the mouse is hovering over
+    the button.
+    """
+
     def __init__(self, hover_glow_mode=True, **kargs):
         super().__init__(**kargs)
         self.handles_mouse_over = True
         self.handles_events = True
         self.handles_mouse_down = True
 
-        # hover glow mode will make the button semi transparent if the mouse is outside its boundaries
+        # hover_glow_mode will make the button semi transparent,
+        # if the mouse is outside its boundaries.
         self.hover_glow_mode = hover_glow_mode
 
     def on_mouse_in(self):
@@ -706,6 +773,10 @@ class ButtonMorph(Morph):
             self.change_appearance(0)
 
     def change_appearance(self, value):
+        """
+        If hovel_glow_mode is enabled, this will change the morph's
+        appearance accordingly.
+        """
 
         if value == 0:
             self.color = (1.0, 1.0, 1.0, 0.5)
