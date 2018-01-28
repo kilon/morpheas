@@ -1,11 +1,18 @@
+"""
+Some necessary functions for Morpheas to work correctly.
+"""
+
+import math
 import bpy
 import bgl
 import blf
 import bpy_extras
-import math
 
 
 def drawRegion(mode, points, color):
+    """
+    Draw a simple shape with given points and color.
+    """
 
     bgl.glColor4f(color[0], color[1], color[2], color[3])
     if mode == 'GL_LINE_LOOP':
@@ -15,14 +22,19 @@ def drawRegion(mode, points, color):
         bgl.glBegin(bgl.GL_POLYGON)
 
     # start with corner right-bottom
-    for i in range(0, len(points)):
-        bgl.glVertex2f(points[i][0], points[i][1])
+    for point in points:
+        bgl.glVertex2f(point[0], point[1])
 
     bgl.glEnd()
 
 
 def drawArc(cx, cy, r, startAngle, arcAngle, numSegments):
-    """Draw round corners, (cx, cy) center of circle, r strength value"""
+    """
+    Draw an arc.
+    (cx, cy) is the center of circle, r is strength value,
+    startAngle and arcAngle in radians, numSegments is the number of points
+    that make the arc.
+    """
     theta = arcAngle / float(numSegments - 1)
     tangetialFactor = math.tan(theta)
     radialFactor = math.cos(theta)
@@ -45,9 +57,13 @@ def drawArc(cx, cy, r, startAngle, arcAngle, numSegments):
 
 
 def roundCorners(x1, y1, x2, y2, value, steps, corners=[True, True, True, True]):
+    """
+    Given a rectangle's upper left and lower right corners, compute the points
+    to create round corners and return them.
+    """
     verts = []
-    # Corner left-bottom
-    if(corners[0]):
+    # Corner left-bottom:
+    if corners[0]:
         x_moved = x1 + value
         y_moved = y1 + value
         verts_round = drawArc(x_moved, y_moved, value, 4.71, -1.57, steps)
@@ -57,7 +73,7 @@ def roundCorners(x1, y1, x2, y2, value, steps, corners=[True, True, True, True])
         verts.append((x1, y1))
 
     # Corner left-top:
-    if(corners[1]):
+    if corners[1]:
         x_moved = x1 + value
         y_moved = y2 - value
         verts_round = drawArc(x_moved, y_moved, value, 3.14, -1.57, steps)
@@ -67,7 +83,7 @@ def roundCorners(x1, y1, x2, y2, value, steps, corners=[True, True, True, True])
         verts.append((x1, y2))
 
     # Corner right-top:
-    if(corners[2]):
+    if corners[2]:
         x_moved = x2 - value
         y_moved = y2 - value
         verts_round = drawArc(x_moved, y_moved, value, 1.57, -1.57, steps)
@@ -77,7 +93,7 @@ def roundCorners(x1, y1, x2, y2, value, steps, corners=[True, True, True, True])
         verts.append((x2, y2))
 
     # Corner right-bottom:
-    if(corners[3]):
+    if corners[3]:
         x_moved = x2 - value
         y_moved = y1 + value
         verts_round = drawArc(x_moved, y_moved, value, 0.0, -1.57, steps)
@@ -88,11 +104,12 @@ def roundCorners(x1, y1, x2, y2, value, steps, corners=[True, True, True, True])
 
     return verts
 
-# Convert color values to float, having max value of 1.0. Couldn't figure a way to do
-# using PyPNG, could be possible.
-
 
 def convertColorValuesToFloat(content):
+    """
+    Convert color values to float, having max value of 1.0. Couldn't figure a way to do
+    using PyPNG, could be possible.
+    """
     content_temp = [[0 for x in range(len(content[0]))]
                     for y in range(len(content))]
     height = len(content[0])

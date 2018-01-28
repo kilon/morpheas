@@ -144,7 +144,7 @@ class Morph:
         self.round_corners_strength = round_corners_strength
 
         # Defines which corners to round if round_corners is true. The order is
-        # [upper_left, upper_right, down_right, down_left]. Default behaviour is
+        # [lower_left, upper_left, upper_right, lower_right]. Default behaviour is
         # to round all of them.
         self.round_corners_select = round_corners_select
 
