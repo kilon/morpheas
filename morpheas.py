@@ -361,14 +361,14 @@ class Morph:
 
     def get_absolute_position(self):
         """
-        Morpheas uses relative position coordinates. Those are the position
-        of Morph added to the position of the parent and of course of the World.
-        This method gets the actual position inside the Blender
-        Window that Morphs are drawn in.
+        Morpheas uses relative position in relation to the 3D Viewport.
+        So to get the right coordinates we need to adjust them.
+        Previous implementation where morphs had relative position to their
+        parents did not work...
         """
         if self.parent is not None:
-            return (self.parent.get_absolute_position()[0] + self.position[0],
-                    self.parent.get_absolute_position()[1] + self.position[1])
+            return (self.world.get_absolute_position()[0] + self.position[0],
+                    self.world.get_absolute_position()[1] + self.position[1])
 
         else:
             return self.position
