@@ -297,12 +297,16 @@ class Morph:
             if self.round_corners:
                 outline = morpheas_tools.roundCorners(
                     self.position[0], self.position[1],
-                    self.width, self.height, self.round_corners_strength,
+                    self.position[0] +
+                    self.width, self.position[1] + self.height,
+                    self.round_corners_strength,
                     self.round_corners_strength, self.round_corners_select)
             else:
                 outline = morpheas_tools.roundCorners(
                     self.position[0], self.position[1],
-                    self.width, self.height, 10, 10, [False, False, False, False])
+                    self.position[0] +
+                    self.width, self.position[1] + self.height,
+                    10, 10, [False, False, False, False])
 
             morpheas_tools.drawRegion('GL_POLYGON', outline, self.color)
 

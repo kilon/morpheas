@@ -58,7 +58,7 @@ def drawArc(cx, cy, r, startAngle, arcAngle, numSegments):
 
 def roundCorners(x1, y1, x2, y2, value, steps, corners=[True, True, True, True]):
     """
-    Given a rectangle's upper left and lower right corners, compute the points
+    Given a rectangle's lower left and upper right corners, compute the points
     to create round corners and return them.
     """
     verts = []
