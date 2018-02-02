@@ -788,6 +788,6 @@ class ButtonMorph(Morph):
         """
 
         if value == 0:
-            self.color = (1.0, 1.0, 1.0, 0.5)
+            self.color = (self.color[0], self.color[1], self.color[2], 0.5)
         if value == 1:
             self.color = (self.color[0], self.color[1], self.color[2], 1.0)
