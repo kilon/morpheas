@@ -706,6 +706,11 @@ class World(Morph):
         assigned by Blender to handle events.
         """
 
+        # If user has maximized screen and fucks about, he might create
+        # some problems and the region will be None. This solves the issue.
+        if context.region is None:
+            return
+
         x1 = context.region.x
         y1 = context.region.y
         self.window_position = (x1, y1)
