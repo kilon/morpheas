@@ -103,17 +103,3 @@ def roundCorners(x1, y1, x2, y2, value, steps, corners=[True, True, True, True])
         verts.append((x2, y1))
 
     return verts
-
-
-def convertColorValuesToFloat(content):
-    """
-    Convert color values to float, having max value of 1.0. Couldn't figure a way to do
-    using PyPNG, could be possible.
-    """
-    content_temp = [[0 for x in range(len(content[0]))]
-                    for y in range(len(content))]
-    height = len(content[0])
-    for i in range(len(content)):
-        for j in range(height):
-            content_temp[i][j] = float(content[i][j]) / 255
-    return content_temp

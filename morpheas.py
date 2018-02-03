@@ -54,7 +54,7 @@ classes for this library to work.
 import bpy
 import blf
 from bgl import *
-from . import png, morpheas_tools
+from . import morpheas_tools
 import pdb
 
 
@@ -216,22 +216,17 @@ class Morph:
 
         # Create the full path of the texture to be loaded and load it.
         full_path = self.texture_path + name
-        f = png.Reader(full_path)
-        f.read()
-        f = f.asRGBA()
+        image = bpy.data.images.load(full_path)
 
-        # Kind of necessary unfortunately, as there is a problems with images
-        # without alpha layer.
-        content = list(f[2])
-        content = morpheas_tools.convertColorValuesToFloat(content)
-
-        buf = Buffer(GL_FLOAT, [len(content), len(content[0])], content)
+        content = list(image.pixels)
+        buf = Buffer(GL_FLOAT, image.size[0] * image.size[1] * 4, content)
 
         # A Morph can have multiple textures if it is needed, the information
         # about those textures are fetched directly from the PNG file.
-        self.textures[name] = {'dimensions': [f[3]['size'][0], f[3]['size'][1]],
-                               'full_path': full_path, 'data': buf,
-                               'is_gl_initialised': False, 'scale': scale, 'texture_id': 0}
+        self.textures[name] = {
+            'dimensions': [image.size[0], image.size[1]],
+            'full_path': full_path, 'data': buf,
+            'is_gl_initialised': False, 'scale': scale, 'texture_id': 0}
 
         self.activate_texture(name)
         return self.textures[name]
@@ -276,14 +271,14 @@ class Morph:
             glEnable(GL_BLEND)
             glEnable(GL_TEXTURE_2D)
             glBegin(GL_QUADS)
-            glTexCoord2f(0, 1)
+            glTexCoord2f(0, 0)
             glVertex2f(self.position[0], self.position[1])
-            glTexCoord2f(1, 1)
-            glVertex2f((self.position[0] + self.width), self.position[1])
             glTexCoord2f(1, 0)
+            glVertex2f((self.position[0] + self.width), self.position[1])
+            glTexCoord2f(1, 1)
             glVertex2f((self.position[0] + self.width),
                        (self.position[1] + self.height))
-            glTexCoord2f(0, 0)
+            glTexCoord2f(0, 1)
             glVertex2f(self.position[0], (self.position[1] + self.height))
 
             # Restore OpenGL context to avoide any conflicts.
