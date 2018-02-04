@@ -160,6 +160,9 @@ class Morph:
         # Each child will have its own active texture.
         self.active_texture = texture
 
+        # Not to be used by anyone but this class.
+        self.image = None
+
         # These are actions which are basically simple python objects
         # that contain an appropriate method like on_left_click or on_right_click.
         # This allows us to keep as MVC model that has the handling of
@@ -216,15 +219,16 @@ class Morph:
 
         # Create the full path of the texture to be loaded and load it.
         full_path = self.texture_path + name
-        image = bpy.data.images.load(full_path)
+        self.image = bpy.data.images.load(full_path)
 
-        content = list(image.pixels)
-        buf = Buffer(GL_FLOAT, image.size[0] * image.size[1] * 4, content)
+        content = list(self.image.pixels)
+        buf = Buffer(
+            GL_FLOAT, self.image.size[0] * self.image.size[1] * 4, content)
 
         # A Morph can have multiple textures if it is needed, the information
         # about those textures are fetched directly from the PNG file.
         self.textures[name] = {
-            'dimensions': [image.size[0], image.size[1]],
+            'dimensions': [self.image.size[0], self.image.size[1]],
             'full_path': full_path, 'data': buf,
             'is_gl_initialised': False, 'scale': scale, 'texture_id': 0}
 
@@ -353,6 +357,20 @@ class Morph:
             if morph.is_hidden != value:
                 morph.is_hidden = value
         self._is_hidden = value
+
+    def delete(self):
+        """
+        Delete morph and all children morphs. Kind of macabre...
+        """
+        for child in self.children:
+            child.delete()
+        try:
+            self.image.user_clear()
+            self.image.gl_free()
+            bpy.data.images.remove(self.image)
+            self.textures.clear()
+        except:
+            pass
 
     def get_absolute_position(self):
         """
