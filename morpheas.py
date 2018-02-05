@@ -375,6 +375,7 @@ class Morph:
     def get_absolute_position(self):
         """
         Morpheas uses relative position in relation to the 3D Viewport.
+        (Not anymore, lol...)
         So to get the right coordinates we need to adjust them.
         Previous implementation where morphs had relative position to their
         parents did not work...
