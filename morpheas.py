@@ -246,6 +246,10 @@ class Morph:
         """
         The main draw function. Kind of a nightmare to figure out...
         """
+        position_x = self.get_absolute_position(
+        )[0] - self.world.draw_area_position[0]
+        position_y = self.get_absolute_position(
+        )[1] - self.world.draw_area_position[1]
 
         # If the morph is not hidden and a texture is given.
         if (not self.is_hidden) and (not len(self.textures) == 0):
@@ -258,8 +262,10 @@ class Morph:
                 at['texture_id'] = Buffer(GL_INT, [1])
                 glGenTextures(1, at['texture_id'])
                 glBindTexture(GL_TEXTURE_2D, at['texture_id'].to_list()[0])
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, at['dimensions'][0], at['dimensions'][1], 0, GL_RGBA, GL_FLOAT,
-                             at['data'])
+                glTexImage2D(
+                    GL_TEXTURE_2D, 0, GL_RGBA,
+                    at['dimensions'][0], at['dimensions'][1], 0, GL_RGBA, GL_FLOAT,
+                    at['data'])
                 glTexParameteri(
                     GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
                 glTexParameteri(
@@ -276,14 +282,15 @@ class Morph:
             glEnable(GL_TEXTURE_2D)
             glBegin(GL_QUADS)
             glTexCoord2f(0, 0)
-            glVertex2f(self.position[0], self.position[1])
+            glVertex2f(position_x, position_y)
             glTexCoord2f(1, 0)
-            glVertex2f((self.position[0] + self.width), self.position[1])
+            glVertex2f((position_x + self.width), position_y)
             glTexCoord2f(1, 1)
-            glVertex2f((self.position[0] + self.width),
-                       (self.position[1] + self.height))
+            glVertex2f(
+                (position_x + self.width),
+                (position_y + self.height))
             glTexCoord2f(0, 1)
-            glVertex2f(self.position[0], (self.position[1] + self.height))
+            glVertex2f(position_x, (position_y + self.height))
 
             # Restore OpenGL context to avoide any conflicts.
             glEnd()
@@ -295,16 +302,16 @@ class Morph:
         elif (not self.is_hidden) and (len(self.textures) == 0):
             if self.round_corners:
                 outline = morpheas_tools.roundCorners(
-                    self.position[0], self.position[1],
-                    self.position[0] +
-                    self.width, self.position[1] + self.height,
+                    position_x, position_y,
+                    position_x +
+                    self.width, position_y + self.height,
                     self.round_corners_strength,
                     self.round_corners_strength, self.round_corners_select)
             else:
                 outline = morpheas_tools.roundCorners(
-                    self.position[0], self.position[1],
-                    self.position[0] +
-                    self.width, self.position[1] + self.height,
+                    position_x, position_y,
+                    position_x +
+                    self.width, position_y + self.height,
                     10, 10, [False, False, False, False])
 
             morpheas_tools.drawRegion('GL_POLYGON', outline, self.color)
@@ -375,14 +382,13 @@ class Morph:
     def get_absolute_position(self):
         """
         Morpheas uses relative position in relation to the 3D Viewport.
-        (Not anymore, lol...)
         So to get the right coordinates we need to adjust them.
         Previous implementation where morphs had relative position to their
         parents did not work...
         """
         if self.parent is not None:
-            return (self.world.get_absolute_position()[0] + self.position[0],
-                    self.world.get_absolute_position()[1] + self.position[1])
+            return (self.parent.get_absolute_position()[0] + self.position[0],
+                    self.parent.get_absolute_position()[1] + self.position[1])
 
         else:
             return self.position
@@ -506,6 +512,9 @@ class Morph:
         apy1 = self.get_absolute_position()[1]
         apx2 = self.get_absolute_position()[0] + self.width
         apy2 = self.get_absolute_position()[1] + self.height
+        # print(
+        #     self.world.mouse_position_absolute[0], " ",
+        #     self.world.mouse_position_absolute[1])
         mx = self.world.mouse_position_absolute[0]
         my = self.world.mouse_position_absolute[1]
         if mx > apx1 and mx < apx2 and my > apy1 and my < apy2:
