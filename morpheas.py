@@ -772,9 +772,13 @@ class TextMorph(Morph):
 
     def draw(self, context):
         if not self.is_hidden:
+            position_x = self.get_absolute_position(
+            )[0] - self.world.draw_area_position[0]
+            position_y = self.get_absolute_position(
+            )[1] - self.world.draw_area_position[1]
             glColor4f(*self.color)
             blf.size(self.font_id, self.size, self.dpi)
-            blf.position(self.font_id, self.position[0], self.position[1], 0)
+            blf.position(self.font_id, position_x, position_y, 0)
             blf.draw(self.font_id, self.text)
 
 
