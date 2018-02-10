@@ -590,7 +590,7 @@ class World(Morph):
     them to the world via add_morph method.
     """
 
-    def __init__(self, **kargs):
+    def __init__(self, singular=True, auto_hide=True, **kargs):
 
         super().__init__(**kargs)
 
@@ -639,6 +639,7 @@ class World(Morph):
         # This is useful when you replicate the same internal window, for example when
         # you have opened multiple 3d views.
         self.draw_area = None
+        self.draw_area_old = None
         self.draw_area_position = [0, 0]
         self.draw_area_width = 300
         self.draw_area_height = 300
@@ -646,7 +647,8 @@ class World(Morph):
 
         # This feature hides the World on regions that the mouse is on top of
         # so it depends on self.mouse_cursor_inside.
-        self.auto_hide = False
+        self.auto_hide = auto_hide
+        self.singular = singular
 
     def get_absolute_position(self):
         """
@@ -656,19 +658,16 @@ class World(Morph):
         return [self.position[0] + self.draw_area_position[0],
                 self.position[1] + self.draw_area_position[1]]
 
+    # World draw depends on Morph draw, what it does additionally is the auto_hide feature
     def draw(self, context):
-        """
-        World draw depends on Morph draw, what it does additionally is the auto_hide feature.
-        """
-
-        # Use OpenGL to get the size of the region we can draw without overlapping with other areas.
+        # Use OpenGL to get the size of the region we can draw without overlapping with other areas
         mybuffer = Buffer(GL_INT, 4)
         glGetIntegerv(GL_VIEWPORT, mybuffer)
         draw_area_old = self.draw_area
         self.draw_area = mybuffer
 
-        # From that extract information about the region and
-        # assign it to relevant instance variables.
+        # from that extract information about the region and
+        # assign it to relevant instance variables
         self.draw_area_position = [mybuffer[0], mybuffer[1]]
         self.draw_area_width = mybuffer[2]
         self.draw_area_height = mybuffer[3]
@@ -680,19 +679,19 @@ class World(Morph):
         mabx = self.mouse_position_absolute[0]
         maby = self.mouse_position_absolute[1]
         self.mouse_cursor_inside = (
-            (mabx > self.draw_area_position[0])
-            and (mabx < (self.draw_area_position[0] + self.draw_area_width)) and (
-                maby > self.draw_area_position[1])
-            and (maby < (self.draw_area_position[1] + self.draw_area_height)))
+            (mabx > self.draw_area_position[0]) and (
+                mabx < (self.draw_area_position[0] + self.draw_area_width)) and (
+                maby > self.draw_area_position[1]) and (
+                    maby < (self.draw_area_position[1] + self.draw_area_height)))
 
         # If auto_hide is enabled, draw my Morphs ONLY if the mouse is located inside the area
         # that draws at the time.
-        if (self.mouse_cursor_inside and self.auto_hide
-                and context.area.type == "VIEW_3D"
-                and context.region.type == "WINDOW") or not self.auto_hide:
+        if (self.mouse_cursor_inside and self.auto_hide and
+                context.area.type == "VIEW_3D" and
+                context.region.type == "WINDOW") or not self.auto_hide:
             self.draw_area_context = context
             for child in self.children:
-                child.draw(context)
+                child.draw(self.draw_area_context)
                 # context.area.tag_redraw()
         else:
             # If it is not, reset the information about the region back
