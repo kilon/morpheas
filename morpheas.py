@@ -48,9 +48,13 @@
 
 
 import bpy, blf
-from bgl import *
+from . import bgl
 from . import png
+from . import livecoding
+from .PIL import Image
+
 import pdb
+import numpy
 
 
 # The Morph is extremely essential in Morpheas. It provides the base
@@ -61,23 +65,22 @@ import pdb
 # also based on morphs, approaching GUI creation as a lego like process
 # of assembling almost identical things together with ease and simplicity
 
-class Morph:
+class Morph(livecoding.LiveObject):
     # global variable for the definition of the default folder where
     # the PNG files which are used as textures are located
     texture_path = "media/graphics/"
-
+    instances =[]
     # this is the main suspect, responsible for the creation of the morph, each keyword argument is associated
     # with an instance variable so see the comment of the relevant instance variable for more information
     def __init__(self, texture=None, width=100, height=100, position=[0, 0], color=[1.0, 1.0, 1.0, 1.0], name='noname',
                  on_left_click_action=None, on_left_click_released_action=None,
                  on_right_click_action=None, on_right_click_released_action=None,
                  on_mouse_in_action=None, on_mouse_out_action=None,
-                 texture_path=None, scale=0.5):
-
-        # pdb.set_trace()
-        self.width = width
-        self.height = height
-        self.position = position
+                 texture_path=None, scale=1):
+        super().__init__()
+        self._width = width
+        self._height = height
+        self._position = position
 
         # one may ask why color in a morph with a texture. None the less color can affect not only the color of the
         # active texture but also its transparency . Color is a list of floats following the RGBA ( red, green, blue
@@ -91,10 +94,8 @@ class Morph:
         self.handles_mouse_down = False
         self.handles_events = False
         self.handles_mouse_over = False
+        self.handles_drag_drop = False
 
-        # these is are the positions of the 4 corners of the boundaries of the morph
-        self.bounds = [self.position[0], self.position[1], self.position[0] + self.width,
-                       self.position[1] + self.height]
 
         self._is_hidden = False
 
@@ -109,7 +110,7 @@ class Morph:
 
         # a name is an optional feature for when you want to locate a specific morph inside a world
         # and do something to it or do something with it
-        self.name = name
+        self._name = name
 
         # this counts the amount of times the morph has been drawn. Can be useful to figure out FPS
         # and make sure Morpheas does not slow down Blender
@@ -120,13 +121,17 @@ class Morph:
 
         # a morph can be scaled like any blender object. The scale is also tied to the scale of the active texture
         # the scale of the active texture depends on the dimensions of the png file
-        self.scale = scale
+        self._scale = scale
 
         # this tells where to find the textures
         if texture_path is None:
             self.texture_path = Morph.texture_path
         else:
             self.texture_path = texture_path
+
+        # drag and drop flag
+        self.drag_drop = False
+        self.drag_position =[]
 
         # active texture is the texture displaying at the time
         # only one texture can display at a time , if you want more then you have to have multiple child morphs
@@ -162,88 +167,95 @@ class Morph:
         else:
             self.load_texture(name)
 
+            # width of the morph
 
-    # this is an internal method not to be used directly by the user
-    # it loads the texture, the actual displaying is handled by the
-    # draw() method
-    # name: is the same as texture and is the name of the PNG file
-    # without the extension
-    # scale: it allows to scale the texture
-    # 1 being texture at full size
-    def load_texture(self, name, scale=0.5):
+    @property
+    def width(self):
 
-        # detect the current location of the addon using Morpheas
-        current_path = __file__[0:-11]
-        bpy.path.basename(current_path)
-        # create the full path of the texture to be loaded and load it
-        full_path = current_path + self.texture_path + name + '.png'
-        f = png.Reader(full_path)
-        f.read()
-        f = f.asFloat()
-        content = list(f[2])
+        if self._width < 0:
+            raise ValueError("width must not be a negative value")
+        else:
+            return self._width
 
-        buf = Buffer(GL_FLOAT, [len(content), len(content[0])], content)
-        # a Morph can have multiple textures if it is needed, the information
-        # about those textures are fetched directly from the PNG file
-        self.textures[name] = {'dimensions': [f[3]['size'][0], f[3]['size'][1]],
-                               'full_path': full_path, 'data': buf,
-                               'is_gl_initialised': False, 'scale': scale, 'texture_id': 0}
+    @width.setter
+    def width(self, value):
+        if value < 0:
+            raise ValueError("new value for width must be a positive number")
+        else:
+            self._width = value
 
-        self.activate_texture(name)
-        return self.textures[name]
+    # height of the morph
+    @property
+    def height(self):
+        if self._height < 0:
+            raise ValueError("height must not be a negative value ")
+        else:
+            return self._height
 
-    # one texture can be active at the time in order to display on screen
-    def activate_texture(self, name):
-        self.active_texture = name
-        self.width = round(self.textures[name]['dimensions'][0] * self.textures[name]['scale'])
-        self.height = round(self.textures[name]['dimensions'][1] * self.textures[name]['scale'])
-        self.scale = self.textures[name]['scale']
+    @height.setter
+    def height(self, value):
+        if value < 0:
+            raise ValueError("new value for width must be a positive number")
+        else:
+            self._height = value
 
-    # the main draw function
-    def draw(self, context):
+    # position is relative to its parent morph.
+    @property
+    def position(self):
+            return self._position
 
-        if (not self.is_hidden) and (not len(self.textures) == 0):
-            self.draw_count = self.draw_count + 1
+    @position.setter
+    def position(self, value):
+        self._position = value
 
-            at = self.textures[self.active_texture]
 
-            # load the active texture to the OpenGL context
-            if not at['is_gl_initialised']:
-                at['texture_id'] = Buffer(GL_INT, [1])
-                glGenTextures(1, at['texture_id'])
-                glBindTexture(GL_TEXTURE_2D, at['texture_id'].to_list()[0])
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, at['dimensions'][0], at['dimensions'][1], 0, GL_RGBA, GL_FLOAT,
-                             at['data'])
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-                at['is_gl_initialised'] = True
-            else:
-                glBindTexture(GL_TEXTURE_2D, at['texture_id'].to_list()[0])
+    # world position returns the position of the morph relative to the world it belongs too
+    @property
+    def world_position(self):
+        if self.parent is not None:
+            return [self.parent.world_position[0] + self.position[0],
+                    self.parent.world_position[1] + self.position[1]]
+        else:
+            return [0,0]
 
-            glColor4f(*self.color)
-            # draw a simple rectangle with the dimensions, position and scale of the Morph
-            # use the active texture as texture of the rectangle
-            glEnable(GL_BLEND)
-            glEnable(GL_TEXTURE_2D)
-            glBegin(GL_QUADS)
-            glTexCoord2f(0, 1)
-            glVertex2f(self.position[0], self.position[1])
-            glTexCoord2f(1, 1)
-            glVertex2f((self.position[0] + self.width), self.position[1])
-            glTexCoord2f(1, 0)
-            glVertex2f((self.position[0] + self.width), (self.position[1] + self.height))
-            glTexCoord2f(0, 0)
-            glVertex2f(self.position[0], (self.position[1] + self.height))
+    # world position is a read only variable
+    @world_position.setter
+    def world_position(self, value):
+        raise ValueError("world_position is read only !")
 
-            # restore OpenGL context to avoide any conflicts
-            glEnd()
-            glDisable(GL_TEXTURE_2D)
-            glDisable(GL_BLEND)
+    # absolute position is the position relative to the entire blender window
+    @property
+    def absolute_position(self):
+        return [self.world_position[0] + self.world.draw_area[0] , self.world_position[1]+ self.world.draw_area[1] ]
 
-        if (not self.is_hidden) and len(self.children) > 0:
+    # world position is a read only variable
+    @absolute_position.setter
+    def absolute_position(self, value):
+        raise ValueError("absolute_position is read only !")
 
-            for child_morph in self.children:
-                child_morph.draw(context)
+    # bounds defines the boundary box of the morph
+    @property
+    def bounds(self):
+        return [self.position[0], self.position[1], self.position[0] + self.width,
+                       self.position[1] + self.height]
+    @bounds.setter
+    def bounds(self,value):
+        raise ValueError("bounds is read only !")
+
+
+
+
+
+    @property
+    def mouse_over_morph(self):
+        apx1 = self.world_position[0]
+        apy1 = self.world_position[1]
+        apx2 = self.world_position[0] + self.width
+        apy2 = self.world_position[1] + self.height
+        ex = self.world.mouse_position[0]
+        ey = self.world.mouse_position[1]
+        result = ( ex > apx1 and ex < apx2 and ey > apy1 and ey < apy2)
+        return result
 
 
 
@@ -260,13 +272,25 @@ class Morph:
     def world(self, value):
         self._world = value
 
+
+
+    @property
+    def scale(self):
+        return self._scale
+
+    @scale.setter
+    def scale(self,value):
+        self._scale = value
+        self.width = round(self.width * value)
+        self.height = round(self.height * value)
+
+        for morph in self.children:
+            morph.scale = value
+
     # a Morph can contain another Morph, if so each morph it contains
     # is called a "child" and for each child it is the parent
     @property
     def parent(self):
-
-        if self._parent == None and self._world != None:
-            self._parent = self.world
         return self._parent
 
     @parent.setter
@@ -284,17 +308,102 @@ class Morph:
                 morph.is_hidden = value
         self._is_hidden = value
 
-    # Morpheas uses relative position coordinates. Those are the position of Morph added to the position
-    # of the parent and of course of the World. This method gets the actual position inside the Blender
-    # Window that Morphs are drawn and all other Blender GUI
-    def get_absolute_position(self):
+    @property
+    def name(self):
+        return self._name
 
-        if self.parent is not None:
-            return (self.parent.get_absolute_position()[0] + self.position[0],
-                    self.parent.get_absolute_position()[1] + self.position[1])
+    @name.setter
+    def name(self,new_name):
+        self._name = new_name
 
-        else:
-            return self.position
+
+    # this is an internal method not to be used directly by the user
+    # it loads the texture, the actual displaying is handled by the
+    # draw() method
+    # name: is the same as texture and is the name of the PNG file
+    # without the extension
+    # scale: it allows to scale the texture
+    # 1 being texture at full size
+    def load_texture(self, name, scale=1):
+
+        # detect the current location of the addon using Morpheas
+        current_path = __file__[0:-11]
+        bpy.path.basename(current_path)
+
+        # create the full path of the texture to be loaded and load it
+        full_path = current_path + self.texture_path + name + '.png'
+        im = Image.open(full_path)
+        data = numpy.array(im)
+        data = data.astype(float)
+        data = numpy.divide(data,255.0)
+        content = numpy.array(data).reshape(im.size[1],im.size[0]*4)
+        buf = bgl.Buffer(bgl.GL_FLOAT, [len(content),len(content[0])], content)
+
+        # a Morph can have multiple textures if it is needed, the information
+        # about those textures are fetched directly from the PNG file
+        self.textures[name] = {'dimensions': [im.size[0], im.size[1]],
+                               'full_path': full_path, 'data': buf,
+                               'is_gl_initialised': False, 'scale': scale, 'texture_id': 0}
+
+        self.activate_texture(name)
+        return self.textures[name]
+
+
+
+    # one texture can be active at the time in order to display on screen
+    def activate_texture(self, name):
+        self.active_texture = name
+        self.width = round(self.textures[name]['dimensions'][0] * self.textures[name]['scale'])
+        self.height = round(self.textures[name]['dimensions'][1] * self.textures[name]['scale'])
+        self.scale = self.textures[name]['scale']
+
+    # the main draw function
+    def draw(self, context):
+
+        if (not self.is_hidden) and (not len(self.textures) == 0):
+            self.draw_count = self.draw_count + 1
+            world_position = self.world_position
+            at = self.textures[self.active_texture]
+
+            # load the active texture to the OpenGL context
+            if not at['is_gl_initialised']:
+                at['texture_id'] = bgl.Buffer(bgl.GL_INT, [1])
+                bgl.glGenTextures(1, at['texture_id'])
+                bgl.glBindTexture(bgl.GL_TEXTURE_2D, at['texture_id'].to_list()[0])
+                bgl.glTexImage2D(bgl.GL_TEXTURE_2D, 0, bgl.GL_RGBA, at['dimensions'][0], at['dimensions'][1], 0, bgl.GL_RGBA, bgl.GL_FLOAT, at['data'])
+                bgl.glTexParameteri(bgl.GL_TEXTURE_2D, bgl.GL_TEXTURE_MIN_FILTER, bgl.GL_NEAREST)
+                bgl.glTexParameteri(bgl.GL_TEXTURE_2D, bgl.GL_TEXTURE_MAG_FILTER, bgl.GL_NEAREST)
+                at['is_gl_initialised'] = True
+            else:
+                bgl.glBindTexture(bgl.GL_TEXTURE_2D, at['texture_id'].to_list()[0])
+
+            bgl.glColor4f(*self.color)
+
+            # draw a simple rectangle with the dimensions, position and scale of the Morph
+            # use the active texture as texture of the rectangle
+            bgl.glEnable(bgl.GL_BLEND)
+            bgl.glEnable(bgl.GL_TEXTURE_2D)
+            bgl.glBegin(bgl.GL_QUADS)
+            bgl.glTexCoord2f(0, 1)
+            bgl.glVertex2f(world_position[0], world_position[1])
+            bgl.glTexCoord2f(1, 1)
+            bgl.glVertex2f((world_position[0] + self.width), world_position[1])
+            bgl.glTexCoord2f(1, 0)
+            bgl.glVertex2f((world_position[0] + self.width), (world_position[1] + self.height))
+            bgl.glTexCoord2f(0, 0)
+            bgl.glVertex2f(world_position[0], (world_position[1] + self.height))
+
+            # restore OpenGL context to avoide any conflicts
+            bgl.glEnd()
+            bgl.glDisable(bgl.GL_TEXTURE_2D)
+            bgl.glDisable(bgl.GL_BLEND)
+
+        if (not self.is_hidden) and len(self.children) > 0:
+
+            for child_morph in self.children:
+                child_morph.draw(context)
+
+
 
     # add the Morph as a child to another Morph, the other Morph becomes the parent
     def add_morph(self, morph):
@@ -303,24 +412,20 @@ class Morph:
         morph.world = self.world
         self.children.append(morph)
 
-        if self.bounds[0] > morph.bounds[0]:
-            self.bounds[0] = morph.bounds[0]
-        if self.bounds[1] > morph.bounds[1]:
-            self.bounds[1] = morph.bounds[1]
-        if self.bounds[2] < morph.bounds[2]:
-            self.bounds[2] = morph.bounds[2]
-        if self.bounds[3] < morph.bounds[3]:
-            self.bounds[3] = morph.bounds[3]
 
     # returns a child morph of a specific name of course this depend on the definition
     # of a name at the creation of Morph or after
     def get_child_morph_named(self, name):
-        for child in self.children:
-            if child.name == name:
-                return child
-            else:
-                child.get_child_morph_named(name)
-        return None
+        if len(self.children)>0:
+            for child in self.children:
+                if child.name == name:
+                    return child
+                elif child.get_child_morph_named(name) is not None:
+                    return child.get_child_morph_named(name)
+        else:
+            return None
+
+
 
     # upper left corner of the bounding box
     def x(self):
@@ -344,26 +449,23 @@ class Morph:
     # relevant methods instead.
     def on_event(self, event, context):
 
-        if self.handles_events and not self.is_hidden:
-            if event.type in {'LEFTMOUSE', 'RIGHTMOUSE'}:
-                self.on_mouse_down(event)
-            elif event.type in {'MOUSEMOVE'}:
-                self.on_mouse_over(event)
-        else:
+        if len(self.children)>0:
             for morph in self.children:
                 morph.on_event(event, context)
 
+        if self.handles_events and not self.is_hidden and not self.world.consumed_event:
+            if event.type in {'LEFTMOUSE', 'RIGHTMOUSE'}:
+                self.on_mouse_click(event)
+
+            elif event.type in {'MOUSEMOVE'}:
+                self.on_mouse_over(event)
+
+
+
+
     # an event when any mouse button is pressed or released
-    def on_mouse_down(self, event):
-
-        apx1 = self.get_absolute_position()[0]
-        apy1 = self.get_absolute_position()[1]
-        apx2 = self.get_absolute_position()[0] + self.width
-        apy2 = self.get_absolute_position()[1] + self.height
-        ex = self.world.mouse_position_absolute[0]
-        ey = self.world.mouse_position_absolute[1]
-
-        if ex > apx1 and ex < apx2 and ey > apy1 and ey < apy2:
+    def on_mouse_click(self, event):
+        if self.mouse_over_morph:
             if self.handles_mouse_down:
                 self.world.consumed_event = True
                 if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
@@ -377,16 +479,16 @@ class Morph:
 
     # an event when the mouse cursor passes over the area occupied by the morph
     def on_mouse_over(self, event):
-
-        apx1 = self.get_absolute_position()[0]
-        apy1 = self.get_absolute_position()[1]
-        apx2 = self.get_absolute_position()[0] + self.width
-        apy2 = self.get_absolute_position()[1] + self.height
-        mx = self.world.mouse_position_absolute[0]
-        my = self.world.mouse_position_absolute[1]
-        if mx > apx1 and mx < apx2 and my > apy1 and my < apy2:
+        if self.drag_drop:
+            offset = [self.world.mouse_position[0] - self.drag_position[0],
+                      self.world.mouse_position[1] - self.drag_position[1]]
+            self.position = [self.position[0] + offset[0], self.position[1] + offset[1]]
+            self.drag_position = self.world.mouse_position
+        if self.mouse_over_morph:
             return self.on_mouse_in()
         else:
+            if self.drag_drop:
+                self.drag_drop = False
             return self.on_mouse_out()
 
     # the following methods should be self explanatory and depend on the action classes passed to the
@@ -395,12 +497,17 @@ class Morph:
         if self.on_left_click_action is not None:
             return self.on_left_click_action.on_left_click(self)
         else:
+            if not self.drag_drop:
+                self.drag_drop = True
+                self.drag_position = self.world.mouse_position
             return self.world.event
 
     def on_left_click_released(self):
         if self.on_left_click_released_action is not None:
             return self.on_left_click_released_action.on_left_click_released(self)
         else:
+            if self.drag_drop:
+                self.drag_drop = False
             return self.world.event
 
     def on_right_click(self):
@@ -443,6 +550,7 @@ class Morph:
 # You need to call only those two methods for Morpheas to work of course taking into account you have already
 # created a world , creted the morphs and added the morphs to the world via add_morph method.
 class World(Morph):
+    instances = []
     def __init__(self, **kargs):
 
         super().__init__(**kargs)
@@ -489,7 +597,7 @@ class World(Morph):
         # for Morpheas any other region can draw graphics and receive events as well
         # this is useful when you replicate the same internal window for example when
         # you have opened multiple 3d views
-        self.draw_area = None
+        self.draw_area = [0,0,0,0]
         self.draw_area_position = [0, 0]
         self.draw_area_width = 300
         self.draw_area_height = 300
@@ -499,6 +607,10 @@ class World(Morph):
         # so it depends on self.mouse_cursor_inside
         self.auto_hide = True
 
+        self._width = 2000
+        self._height = 2000
+
+
     # position with coordinates that start [0,0] at the bottom of the entire Blender window
     # (not to be confused with Blender's own internal windows)
     def get_absolute_position(self):
@@ -506,74 +618,57 @@ class World(Morph):
 
     # World draw depends on Morph draw, what it does additionally is the auto_hide feature
     def draw(self, context):
-        # Use OpenGL to get the size of the region we can draw without overlapping with other areas
-        mybuffer = Buffer(GL_INT, 4)
-        glGetIntegerv(GL_VIEWPORT, mybuffer)
-        draw_area_old = self.draw_area
-        self.draw_area = mybuffer
+        if self.event is not None:
+            # Use OpenGL to get the size of the region we can draw without overlapping with other areas
+            mybuffer = bgl.Buffer(bgl.GL_INT, 4)
+            bgl.glGetIntegerv(bgl.GL_VIEWPORT, mybuffer)
+            mx = self.event.mouse_region_x
+            my = self.event.mouse_region_y
+            mabx = self.mouse_position_absolute[0]
+            maby = self.mouse_position_absolute[1]
+            self.mouse_cursor_inside = (
+            (mabx > mybuffer[0]) and (mabx < (mybuffer[0] + mybuffer[2])) and (
+            maby > mybuffer[1]) and (maby < (mybuffer[1] + mybuffer[3])))
 
-        # from that extract information about the region and
-        # assign it to relevant instance variables
-        self.draw_area_position = [mybuffer[0], mybuffer[1]]
-        self.draw_area_width = mybuffer[2]
-        self.draw_area_height = mybuffer[3]
-
-        mx = self.mouse_position[0]
-        my = self.mouse_position[1]
-        self.mouse_position_absolute = [mx + self.window_position[0], my + self.window_position[1]]
-        mabx = self.mouse_position_absolute[0]
-        maby = self.mouse_position_absolute[1]
-        self.mouse_cursor_inside = (
-        (mabx > self.draw_area_position[0]) and (mabx < (self.draw_area_position[0] + self.draw_area_width)) and (
-        maby > self.draw_area_position[1]) and (maby < (self.draw_area_position[1] + self.draw_area_height)))
-
-        # if auto_hide is enabled , draw my Morphs ONLY if the mouse is located inside the area
-        # that draws at the time
-        if (
-                    self.mouse_cursor_inside and self.auto_hide and context.area.type == "VIEW_3D" and context.region.type == "WINDOW") or not self.auto_hide:
-            self.draw_area_context = context
-            for child in self.children:
-                child.draw(context)
-                # context.area.tag_redraw()
-        else:
-            # if it is not, reset the information about the region back to previous region as the active region
-            if draw_area_old is not None:
-                mybuffer = draw_area_old
+            # if auto_hide is enabled , draw my Morphs ONLY if the mouse is located inside the area
+            # that draws at the time
+            if (self.mouse_cursor_inside and self.auto_hide and context.area.type == "VIEW_3D" and context.region.type == "WINDOW") or not self.auto_hide:
+                self.draw_area_context = context
                 self.draw_area = mybuffer
+
+                # from that extract information about the region and
+                # assign it to relevant instance variables
                 self.draw_area_position = [mybuffer[0], mybuffer[1]]
                 self.draw_area_width = mybuffer[2]
                 self.draw_area_height = mybuffer[3]
 
+                self.mouse_position = [self.mouse_position_absolute[0]-self.draw_area[0],
+                                       self.mouse_position_absolute[1]-self.draw_area[1]]
+
+                for child in self.children:
+                    child.draw(context)
+                    # context.area.tag_redraw()
+
     # a world cannot have a world by itself and of course not a parent
     # this is why we override the Morph add_morph method
     def add_morph(self, morph):
-
-        morph.parent = self
+        super().add_morph(morph)
         morph.world = self
-        self.children.append(morph)
 
-        if self.bounds[0] > morph.bounds[0]:
-            self.bounds[0] = morph.bounds[0]
-        if self.bounds[1] > morph.bounds[1]:
-            self.bounds[1] = morph.bounds[1]
-        if self.bounds[2] < morph.bounds[2]:
-            self.bounds[2] = morph.bounds[2]
-        if self.bounds[3] < morph.bounds[3]:
-            self.bounds[3] = morph.bounds[3]
 
     # again this depends on Morph on_event
     # Here we automatically set up information about which region has been
     # assigned by Blender to handle events
     def on_event(self, event, context):
 
-        x1 = context.region.x
-        y1 = context.region.y
-        self.window_position = (x1, y1)
-        x2 = context.region.width
-        y2 = context.region.height
-        self.window_width = x2
-        self.window_height = y2
-        self.mouse_position = [event.mouse_region_x, event.mouse_region_y]
+        bmx = context.region.x
+        bmy = context.region.y
+        self.window_position = (bmx, bmy)
+
+        self.window_width =  context.region.width
+        self.window_height = context.region.height
+
+        self.mouse_position_absolute = [event.mouse_region_x + self.window_position[0], event.mouse_region_y + self.window_position[1]]
         self.event = event
 
         # consume_event is reset so World does not block events that are not handled by it
@@ -589,23 +684,29 @@ class World(Morph):
             morph.on_event(event, context)
 
 
+
+
 # StringMorph is a class that defines a simple label , a piece of text of any size
 # size: is the size of the font
 class TextMorph(Morph):
-    def __init__(self, font_id=0, text="empty string", x=15, y=0, size=16, dpi=72, **kargs):
-        self.position = [x, y]
+    instances = []
+    def __init__(self, font_id=0, text="empty string",size=16, dpi=72, **kargs):
         super().__init__(texture=None, **kargs)
         self.size = size
         self.dpi = dpi
         self.text = text
-        self.font_id = 0
+        self.font_id = font_id
+        self.text_lines = self.text.splitlines()
+
 
     def draw(self, context):
+        self.text_lines = self.text.splitlines()
         if (not self.is_hidden):
-            glColor4f(*self.color)
+            bgl.glColor4f(*self.color)
             blf.size(self.font_id, self.size, self.dpi)
-            blf.position(self.font_id, self.position[0], self.position[1], 0)
-            blf.draw(self.font_id, self.text)
+            for x in range(0,len(self.text_lines)):
+                blf.position(self.font_id, self.position[0], self.position[1] + (self.size*x*(-1)), 0)
+                blf.draw(self.font_id, self.text_lines[x])
 
 
 # a ButtonMorph is a morph that responds to an action. This is a default
@@ -613,6 +714,7 @@ class TextMorph(Morph):
 # an easy way to change the morph appearance when the mouse is hovering over
 # the button
 class ButtonMorph(Morph):
+    instances = []
     def __init__(self, hover_glow_mode=True, **kargs):
         super().__init__(**kargs)
         self.handles_mouse_over = True
@@ -633,7 +735,7 @@ class ButtonMorph(Morph):
     def change_appearance(self, value):
 
         if value == 0:
-            self.color = (1.0, 1.0, 1.0, 0.5)
+            self.color = (self.color[0], self.color[1], self.color[2], 0.8)
         if value == 1:
             self.color = (self.color[0], self.color[1], self.color[2], 1.0)
 
