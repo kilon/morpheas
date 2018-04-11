@@ -1,6 +1,6 @@
 from bgl import *
 from .PIL import Image
-from .livecoding import *
+from ..livecoding import *
 import numpy
 
 class MOpenGLCanvas(LiveObject):

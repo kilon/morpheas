@@ -46,10 +46,10 @@
 # ================================================================
 
 
-import bpy, blf
-from . import bgl
-from . import livecoding
-from .morpheas_backend import *
+import bpy, blf,bgl
+
+from .. import livecoding
+from .backend import *
 from .PIL import Image
 
 import pdb
@@ -325,7 +325,7 @@ class Morph(livecoding.LiveObject):
     def load_texture(self, name, scale=1):
 
         # detect the current location of the addon using Morpheas
-        current_path = __file__[0:-11]
+        current_path = __file__[0:-20]
         bpy.path.basename(current_path)
 
         # create the full path of the texture to be loaded and load it
