@@ -1,13 +1,12 @@
 from bgl import *
 from .PIL import Image
 from ..livecoding import *
-import numpy
-
+import numpy,pdb
 class MOpenGLCanvas(LiveObject):
 
     def __init__(self,world):
         self.world = world
-        self.openGLversion = 1.0
+        self.openGLversion = 3.3
         self.vertices_list = []
         self.needs_to_update_vertices_list = False
 
@@ -25,10 +24,11 @@ class MOpenGLCanvas(LiveObject):
 
             #self.clean_up()
 
-    def generate_vertices_list(self,morph_target=None):
+    def generate_vertices_list(self, morph_target= None):
 
-        if morph_target.parent is None or (morph_target is self.world):
+        if morph_target is None or morph_target is self.world:
             # world bounds in screen coordinates
+            morph_target=self.world
             px1 = self.world.draw_area_position[0]
             py1 = self.world.draw_area_position[1]
             px2 = self.world.draw_area_position[0]+self.world.width

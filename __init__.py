@@ -55,6 +55,8 @@ from .PIL import Image
 import pdb
 import numpy
 
+live_enviroment = livecoding.LiveEnviroment()
+live_enviroment.live_modules=["livecoding"]
 
 # The Morph is extremely essential in Morpheas. It provides the base
 # class that all other morph classes are inherit from. In this class is
@@ -579,6 +581,7 @@ class World(Morph):
     #  draw depends on Morph draw, what it does additionally is the auto_hide feature
     def draw(self, context):
         self.draw_area_context = context
+        print("hello")
         if self.event is not None:
             # Use OpenGL to get the size of the region we can draw without overlapping with other areas
             mybuffer = bgl.Buffer(bgl.GL_INT, 4)
