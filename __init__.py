@@ -55,7 +55,7 @@ from .PIL import Image
 import pdb
 import numpy
 
-live_environment = livecoding.LiveEnviroment()
+live_environment = livecoding.LiveEnvironment()
 live_environment.live_modules=["livecoding"]
 
 # The Morph is extremely essential in Morpheas. It provides the base
