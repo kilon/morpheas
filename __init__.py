@@ -49,14 +49,14 @@
 import bpy, blf,bgl
 
 from .. import livecoding
-from .backend import *
+from . import backend
 from .PIL import Image
 
 import pdb
 import numpy
 
 live_environment = livecoding.LiveEnvironment()
-live_environment.live_modules=["livecoding"]
+live_environment.live_modules=["livecoding","backend"]
 
 # The Morph is extremely essential in Morpheas. It provides the base
 # class that all other morph classes are inherit from. In this class is
@@ -565,7 +565,7 @@ class World(Morph):
 
         #MOpenGLCanvas is the backend of Morpheas responsible for all drawing functionality
 
-        self.mOpenGLCanvas = MOpenGLCanvas(self)
+        self.mOpenGLCanvas = backend.MOpenGLCanvas(self)
 
         self.can_draw = False
 
@@ -581,7 +581,7 @@ class World(Morph):
     #  draw depends on Morph draw, what it does additionally is the auto_hide feature
     def draw(self, context):
         self.draw_area_context = context
-        print("hello")
+        print("IT FUCKING WORKSSSS!!!!!!")
         if self.event is not None:
             # Use OpenGL to get the size of the region we can draw without overlapping with other areas
             mybuffer = bgl.Buffer(bgl.GL_INT, 4)

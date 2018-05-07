@@ -1,10 +1,12 @@
 from bgl import *
 from .PIL import Image
-from ..livecoding import *
+from .. import livecoding
 import numpy,pdb
-class MOpenGLCanvas(LiveObject):
 
+class MOpenGLCanvas(livecoding.LiveObject):
+    instances = []
     def __init__(self,world):
+        super().__init__()
         self.world = world
         self.openGLversion = 3.3
         self.vertices_list = []
@@ -12,9 +14,11 @@ class MOpenGLCanvas(LiveObject):
 
 
     def draw(self):
+        #print("loop is definetly NOT running **********************************************************************")
         if self.needs_to_update_vertices_list:
             self.vertices_list = []
             self.generate_vertices_list()
+
         # if self.openGLversion < 1.9:
         #     if not texture['is_gl_initialised']:
         #         self.initialise_texture(texture)
