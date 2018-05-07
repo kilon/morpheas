@@ -581,7 +581,6 @@ class World(Morph):
     #  draw depends on Morph draw, what it does additionally is the auto_hide feature
     def draw(self, context):
         self.draw_area_context = context
-        print("IT FUCKING WORKSSSS!!!!!!")
         if self.event is not None:
             # Use OpenGL to get the size of the region we can draw without overlapping with other areas
             mybuffer = bgl.Buffer(bgl.GL_INT, 4)
