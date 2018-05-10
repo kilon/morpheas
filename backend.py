@@ -11,13 +11,16 @@ class MOpenGLCanvas(livecoding.LiveObject):
         self.openGLversion = 3.3
         self.vertices_list = []
         self.needs_to_update_vertices_list = False
+        self.initialised_OpenGL_context = False
 
 
     def draw(self):
-        #print("loop is definetly NOT running **********************************************************************")
+        #print("ok maybe it does")
         if self.needs_to_update_vertices_list:
             self.vertices_list = []
             self.generate_vertices_list()
+        if not self.initialised_OpenGL_context:
+            self.initialise_OpenGL_context()
 
         # if self.openGLversion < 1.9:
         #     if not texture['is_gl_initialised']:
@@ -27,7 +30,8 @@ class MOpenGLCanvas(livecoding.LiveObject):
 
 
             #self.clean_up()
-
+    def initialise_OpenGL_context(self):
+        return
     def generate_vertices_list(self, morph_target= None):
 
         if morph_target is None or morph_target is self.world:
