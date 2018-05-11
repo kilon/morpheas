@@ -1,9 +1,9 @@
 from bgl import *
 from .PIL import Image
-from .. import livecoding
+from .. import pylivecoding
 import numpy,pdb
 
-class MOpenGLCanvas(livecoding.LiveObject):
+class MOpenGLCanvas(pylivecoding.LiveObject):
     instances = []
     def __init__(self,world):
         super().__init__()

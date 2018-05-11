@@ -48,15 +48,15 @@
 
 import bpy, blf,bgl
 
-from .. import livecoding
+from .. import pylivecoding
 from . import backend
 from .PIL import Image
 
 import pdb
 import numpy
 
-live_environment = livecoding.LiveEnvironment()
-live_environment.live_modules=["livecoding","backend"]
+live_environment = pylivecoding.LiveEnvironment()
+live_environment.live_modules=["pylivecoding","backend"]
 
 # The Morph is extremely essential in Morpheas. It provides the base
 # class that all other morph classes are inherit from. In this class is
@@ -66,7 +66,7 @@ live_environment.live_modules=["livecoding","backend"]
 # also based on morphs, approaching GUI creation as a lego like process
 # of assembling almost identical things together with ease and simplicity
 
-class Morph(livecoding.LiveObject):
+class Morph(pylivecoding.LiveObject):
     # global variable for the definition of the default folder where
     # the PNG files which are used as textures are located
     texture_path = "media/graphics/"
