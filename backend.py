@@ -15,7 +15,7 @@ class MOpenGLCanvas(pylivecoding.LiveObject):
 
 
     def draw(self):
-        #print("ok maybe it does")
+        #print("ok maybe it does not")
         if self.needs_to_update_vertices_list:
             self.vertices_list = []
             self.generate_vertices_list()
