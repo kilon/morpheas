@@ -12,6 +12,18 @@ class MOpenGLCanvas(pylivecoding.LiveObject):
         self.vertices_list = []
         self.needs_to_update_vertices_list = False
         self.initialised_OpenGL_context = False
+        self.success_pointer = None
+        self.void_pointer = None
+        self.VAO_pointer = None
+        self.VBO_pointer = None
+        self.vertex_shader = None
+        self.vertex_shader_source = None
+        self.fragment_shader = None
+        self.fragment_shader_source = None
+        self.vertices = []
+        self.shader_program = None
+
+
 
 
     def draw(self):
@@ -22,6 +34,10 @@ class MOpenGLCanvas(pylivecoding.LiveObject):
         if not self.initialised_OpenGL_context:
             self.initialise_OpenGL_context()
 
+        glUseProgram(self.shader_program)
+        glBindVertexArray(self.VAO_pointer.to_list()[0])
+        glClearColor(0.0, 0.0, 0.4, 0.0)
+        glDrawArrays(GL_TRIANGLES, 0, 3)
         # if self.openGLversion < 1.9:
         #     if not texture['is_gl_initialised']:
         #         self.initialise_texture(texture)
@@ -31,6 +47,72 @@ class MOpenGLCanvas(pylivecoding.LiveObject):
 
             #self.clean_up()
     def initialise_OpenGL_context(self):
+        print("initialising OpenGL context")
+        self.vertices = [-0.5,-0.5,0.0,
+                    0.5,-0.5,0.0,
+                    0.0,0.5,0.0]
+        vertices_pointer = Buffer(GL_FLOAT,[len(self.vertices)],self.vertices)
+
+        #initialise VAO
+        self.VAO_pointer = Buffer(GL_INT, [1])
+        glGenVertexArrays(1, self.VAO_pointer)
+        glBindVertexArray(self.VAO_pointer.to_list()[0])
+
+        #initialise VBO
+        self.VBO_pointer = Buffer(GL_INT,[1])
+        glGenBuffers(1,self.VBO_pointer)
+        glBindBuffer(GL_ARRAY_BUFFER,self.VBO_pointer.to_list()[0])
+        glBufferData(GL_ARRAY_BUFFER,len(self.vertices),vertices_pointer, GL_STATIC_DRAW)
+        self.void_pointer = Buffer(GL_INT,[1])
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, self.void_pointer)
+        glEnableVertexAttribArray(0)
+        print("initialising vertext shader")
+        #vertex shader
+        self.vertex_shader_source= " # version 330 core \nlayout(location=0) in vec3 aPos; \nvoid main()\n{\n" \
+                              "gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n}"
+        print("vertex shader source : ",self.vertex_shader_source)
+        self.vertex_shader = glCreateShader(GL_VERTEX_SHADER)
+        glShaderSource(self.vertex_shader,self.vertex_shader_source)
+        glCompileShader(self.vertex_shader)
+        self.success_pointer = Buffer(GL_INT,[1])
+        infolog=[]
+        glGetShaderiv(self.vertex_shader,GL_COMPILE_STATUS, self.success_pointer)
+        if not self.success_pointer.to_list()[0]:
+            glGetShaderInfoLog(self.vertex_shader, 512, 0, infolog)
+            print("vertex shader error log:",infolog)
+
+
+        #fragment shadert
+        print("intialising fragment shader")
+        self.fragment_shader_source = "#version 330 core\n out vec4 FragColor; \n void main()\n{\n FragColor = vec4(" \
+                                   "1.0f, " \
+                                 "0.0f, 0.0f, 0.2f);\n }\n "
+        print("fragment shader source : ",self.fragment_shader_source )
+        self.fragment_shader = glCreateShader(GL_FRAGMENT_SHADER)
+        glShaderSource(self.fragment_shader,self.fragment_shader_source)
+        glCompileShader(self.fragment_shader)
+        glGetShaderiv(self.fragment_shader, GL_COMPILE_STATUS, self.success_pointer)
+        if not self.success_pointer.to_list()[0]:
+            glGetShaderInfoLog(self.fragment_shader, 512, 0, infolog)
+            #print("fragment shader error log:", infolog)
+
+        #shader program
+        print("initialsing shader program")
+        self.shader_program = glCreateProgram()
+        glAttachShader(self.shader_program, self.vertex_shader)
+        glAttachShader(self.shader_program, self.fragment_shader)
+        glLinkProgram(self.shader_program)
+        glGetProgramiv(self.shader_program,GL_LINK_STATUS,self.success_pointer)
+        if not self.success_pointer.to_list()[0]:
+            glGetProgramInfoLog(self.shader_program, 512, 0, infolog)
+            print("fragment shader error log:", infolog)
+
+        err = 1
+        while err is not GL_NO_ERROR :
+            print("new OpenGL error : ",err)
+            err = glGetError()
+        self.initialised_OpenGL_context = True
+
         return
     def generate_vertices_list(self, morph_target= None):
 

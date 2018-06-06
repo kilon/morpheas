@@ -332,8 +332,7 @@ class Morph(pylivecoding.LiveObject):
         bpy.path.basename(current_path)
 
         # create the full path of the texture to be loaded and load it
-        full_path = current_path + '/'+self.texture_path + name + '.png'
-        pdb.set_trace()
+        full_path = current_path[0:-9] + '/'+self.texture_path + name + '.png'
         im = Image.open(full_path)
         data = numpy.array(im)
         data = data.astype(float)
