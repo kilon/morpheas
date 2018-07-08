@@ -73,13 +73,14 @@ class Morph:
     # the PNG files which are used as textures are located.
     texture_path = "media/graphics/"
 
-    def __init__(self, texture=None, width=100, height=100, position=[0, 0],
-                 color=[1.0, 1.0, 1.0, 1.0], name='noname',
-                 on_left_click_action=None, on_left_click_released_action=None,
-                 on_right_click_action=None, on_right_click_released_action=None,
-                 on_mouse_in_action=None, on_mouse_out_action=None,
-                 texture_path=None, scale=0.5, round_corners=False,
-                 round_corners_strength=10, round_corners_select=[True, True, True, True]):
+    def __init__(
+            self, texture=None, width=100, height=100, position=[0, 0],
+            color=[1.0, 1.0, 1.0, 1.0], name='noname',
+            on_left_click_action=None, on_left_click_released_action=None,
+            on_right_click_action=None, on_right_click_released_action=None,
+            on_mouse_in_action=None, on_mouse_out_action=None,
+            texture_path=None, scale=0.5, round_corners=False,
+            round_corners_strength=10, round_corners_select=[True, True, True, True]):
         """
         This is responsible for the creation of the morph, each keyword argument
         is associated with an instance variable so see the comment of the relevant
@@ -87,9 +88,9 @@ class Morph:
         """
 
         # If you need explanation for this, I'm worried about you.
-        self.width = width
-        self.height = height
-        self.position = position
+        self._width = width
+        self._height = height
+        self._position = position
 
         # If no texture is defined, then this is the color of the morph.
         # Else, this affects the color and transparency of the texture.
@@ -105,10 +106,7 @@ class Morph:
         self.handles_mouse_down = False
         self.handles_events = False
         self.handles_mouse_over = False
-
-        # These is are the positions of the 4 corners of the boundaries of the morph.
-        self.bounds = [self.position[0], self.position[1], self.position[0] + self.width,
-                       self.position[1] + self.height]
+        self.handles_drag_drop = False
 
         self._is_hidden = False
 
@@ -122,9 +120,14 @@ class Morph:
         # where the mouse is and what region draws at the time.
         self._world = None
 
+        # These is are the positions of the 4 corners of the boundaries of the morph.
+        self.bounds = [
+            self.position[0], self.position[1], self.position[0] + self.width,
+            self.position[1] + self.height]
+
         # A name is an optional feature for when you want to locate a specific morph inside a world
         # and do something to or with it.
-        self.name = name
+        self._name = name
 
         # This counts the amount of times the morph has been drawn. Can be useful to figure out FPS
         # and make sure Morpheas does not slow down Blender.
@@ -153,6 +156,10 @@ class Morph:
             self.texture_path = Morph.texture_path
         else:
             self.texture_path = texture_path
+
+        # Drag and drop flag.
+        self.drag_drop = False
+        self.drag_position = []
 
         # Active texture is the texture displaying at the time.
         # Only one texture can display at a time for each morph,
@@ -199,6 +206,107 @@ class Morph:
         else:
             self.load_texture(name)
 
+    @property
+    def width(self):
+        """
+        Return the width of the morph.
+        """
+        if self._width < 0:
+            raise ValueError("width must not be a negative value")
+        else:
+            return self._width
+
+    @width.setter
+    def width(self, value):
+        """
+        Change the width of the morph.
+        """
+        if value < 0:
+            raise ValueError("new value for width must be a positive number")
+        else:
+            self._width = value
+
+    @property
+    def height(self):
+        """
+        Return the height of the morph.
+        """
+        if self._height < 0:
+            raise ValueError("height must not be a negative value ")
+        else:
+            return self._height
+
+    @height.setter
+    def height(self, value):
+        """
+        Change the height of the morph.
+        """
+        if value < 0:
+            raise ValueError("new value for width must be a positive number")
+        else:
+            self._height = value
+
+    @property
+    def position(self):
+        """
+        Return the position of the morph.
+        """
+        return self._position
+
+    @position.setter
+    def position(self, value):
+        """
+        Change the position of the morph.
+        """
+        self._position = value
+
+    @property
+    def world_position(self):
+        """
+        Return world position of the morph.
+        """
+        if self.parent is not None:
+            return [self.parent.world_position[0] + self.position[0],
+                    self.parent.world_position[1] + self.position[1]]
+        else:
+            return [0, 0]
+
+    @world_position.setter
+    def world_position(self, value):
+        """
+        Can't change world position, stupid!
+        """
+        raise ValueError("world_position is read only !")
+
+    @property
+    def absolute_position(self):
+        """
+        Return absolute position of morph.
+        """
+        return [self.world_position[0] + self.world.draw_area[0],
+                self.world_position[1] + self.world.draw_area[1]]
+
+    @absolute_position.setter
+    def absolute_position(self, value):
+        """
+        Can't change absolute position either...
+        """
+        raise ValueError("absolute_position is read only !")
+
+    @property
+    def mouse_over_morph(self):
+        """
+        Return true if mouse is over morph.
+        """
+        apx1 = self.get_absolute_position()[0]
+        apy1 = self.get_absolute_position()[1]
+        apx2 = self.get_absolute_position()[0] + self.width
+        apy2 = self.get_absolute_position()[1] + self.height
+        ex = self.world.mouse_position_absolute[0]
+        ey = self.world.mouse_position_absolute[1]
+        result = (ex > apx1 and ex < apx2 and ey > apy1 and ey < apy2)
+        return result
+
     # this is an internal method not to be used directly by the user
     # it loads the texture, the actual displaying is handled by the
     # draw() method
@@ -233,6 +341,7 @@ class Morph:
             'is_gl_initialised': False, 'scale': scale, 'texture_id': 0}
 
         self.activate_texture(name)
+
         return self.textures[name]
 
     def activate_texture(self, name):
@@ -343,8 +452,6 @@ class Morph:
         A Morph can contain another Morph. If so, each morph it contains
         is called a "child" and for each child it is it's parent.
         """
-        if self._parent is None and self._world is not None:
-            self._parent = self.world
         return self._parent
 
     @parent.setter
@@ -365,6 +472,21 @@ class Morph:
                 morph.is_hidden = value
         self._is_hidden = value
 
+    @property
+    def name(self):
+        """
+        Return morph's name.
+        """
+        return self._name
+
+    @name.setter
+    def name(self, new_name):
+        """
+        Change morph's name.
+        """
+        self._name = new_name
+
+    # Not in core.
     def delete(self):
         """
         Delete morph and all children morphs. Kind of macabre...
@@ -379,6 +501,7 @@ class Morph:
         except:
             pass
 
+    # Not in core.
     def get_absolute_position(self):
         """
         Morpheas uses relative position in relation to the 3D Viewport.
@@ -470,28 +593,22 @@ class Morph:
         call the relevant methods instead.
         """
 
-        if self.handles_events and not self.is_hidden:
-            if event.type in {'LEFTMOUSE', 'RIGHTMOUSE'}:
-                self.on_mouse_down(event)
-            elif event.type in {'MOUSEMOVE'}:
-                self.on_mouse_over(event)
-        else:
+        if len(self.children) > 0:
             for morph in self.children:
                 morph.on_event(event, context)
 
-    def on_mouse_down(self, event):
+        if self.handles_events and not self.is_hidden and not self.world.consumed_event:
+            if event.type in {'LEFTMOUSE', 'RIGHTMOUSE'}:
+                self.on_mouse_click(event)
+
+            elif event.type in {'MOUSEMOVE'}:
+                self.on_mouse_over(event)
+
+    def on_mouse_click(self, event):
         """
         An event when any mouse button is pressed or released.
         """
-
-        apx1 = self.get_absolute_position()[0]
-        apy1 = self.get_absolute_position()[1]
-        apx2 = self.get_absolute_position()[0] + self.width
-        apy2 = self.get_absolute_position()[1] + self.height
-        ex = self.world.mouse_position_absolute[0]
-        ey = self.world.mouse_position_absolute[1]
-
-        if ex > apx1 and ex < apx2 and ey > apy1 and ey < apy2:
+        if self.mouse_over_morph:
             if self.handles_mouse_down:
                 self.world.consumed_event = True
                 if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
@@ -505,21 +622,21 @@ class Morph:
 
     def on_mouse_over(self, event):
         """
-        An event when the mouse cursor passes over the area occupied by the morph.
+        Αn event when the mouse cursor passes over the area occupied by the morph.
         """
-
-        apx1 = self.get_absolute_position()[0]
-        apy1 = self.get_absolute_position()[1]
-        apx2 = self.get_absolute_position()[0] + self.width
-        apy2 = self.get_absolute_position()[1] + self.height
-        # print(
-        #     self.world.mouse_position_absolute[0], " ",
-        #     self.world.mouse_position_absolute[1])
-        mx = self.world.mouse_position_absolute[0]
-        my = self.world.mouse_position_absolute[1]
-        if mx > apx1 and mx < apx2 and my > apy1 and my < apy2:
+        if self.drag_drop:
+            offset = [
+                self.world.mouse_position[0] - self.drag_position[0],
+                self.world.mouse_position[1] - self.drag_position[1]]
+            self.position = [
+                self.position[0] +
+                offset[0], self.position[1] + offset[1]]
+            self.drag_position = self.world.mouse_position
+        if self.mouse_over_morph:
             return self.on_mouse_in()
         else:
+            if self.drag_drop:
+                self.drag_drop = False
             return self.on_mouse_out()
 
     # The following methods should be self explanatory and
@@ -531,12 +648,17 @@ class Morph:
         if self.on_left_click_action is not None:
             return self.on_left_click_action.on_left_click(self)
         else:
+            if not self.drag_drop:
+                self.drag_drop = True
+                self.drag_position = self.world.mouse_position
             return self.world.event
 
     def on_left_click_released(self):
         if self.on_left_click_released_action is not None:
             return self.on_left_click_released_action.on_left_click_released(self)
         else:
+            if self.drag_drop:
+                self.drag_drop = False
             return self.world.event
 
     def on_right_click(self):
@@ -638,8 +760,7 @@ class World(Morph):
         # for Morpheas any other region can draw graphics and receive events as well.
         # This is useful when you replicate the same internal window, for example when
         # you have opened multiple 3d views.
-        self.draw_area = None
-        self.draw_area_old = None
+        self.draw_area = [0, 0, 0, 0]
         self.draw_area_position = [0, 0]
         self.draw_area_width = 300
         self.draw_area_height = 300
@@ -647,8 +768,10 @@ class World(Morph):
 
         # This feature hides the World on regions that the mouse is on top of
         # so it depends on self.mouse_cursor_inside.
-        self.auto_hide = auto_hide
-        self.singular = singular
+        self.auto_hide = True
+
+        self._width = 2000
+        self._height = 2000
 
     def get_absolute_position(self):
         """
@@ -660,48 +783,39 @@ class World(Morph):
 
     # World draw depends on Morph draw, what it does additionally is the auto_hide feature
     def draw(self, context):
-        # Use OpenGL to get the size of the region we can draw without overlapping with other areas
-        mybuffer = Buffer(GL_INT, 4)
-        glGetIntegerv(GL_VIEWPORT, mybuffer)
-        draw_area_old = self.draw_area
-        self.draw_area = mybuffer
+        self.draw_area_context = context
+        if self.event is not None:
+            # Use OpenGL to get the size of the region we can draw without overlapping with other areas
+            mybuffer = Buffer(GL_INT, 4)
+            glGetIntegerv(GL_VIEWPORT, mybuffer)
+            mx = self.event.mouse_region_x
+            my = self.event.mouse_region_y
+            mabx = self.mouse_position_absolute[0]
+            maby = self.mouse_position_absolute[1]
+            self.mouse_cursor_inside = (
+                (mabx > mybuffer[0]) and (mabx < (mybuffer[0] + mybuffer[2])) and (
+                    maby > mybuffer[1]) and (maby < (mybuffer[1] + mybuffer[3])))
 
-        # from that extract information about the region and
-        # assign it to relevant instance variables
-        self.draw_area_position = [mybuffer[0], mybuffer[1]]
-        self.draw_area_width = mybuffer[2]
-        self.draw_area_height = mybuffer[3]
-
-        mx = self.mouse_position[0]
-        my = self.mouse_position[1]
-        self.mouse_position_absolute = [
-            mx + self.window_position[0], my + self.window_position[1]]
-        mabx = self.mouse_position_absolute[0]
-        maby = self.mouse_position_absolute[1]
-        self.mouse_cursor_inside = (
-            (mabx > self.draw_area_position[0]) and (
-                mabx < (self.draw_area_position[0] + self.draw_area_width)) and (
-                maby > self.draw_area_position[1]) and (
-                    maby < (self.draw_area_position[1] + self.draw_area_height)))
-
-        # If auto_hide is enabled, draw my Morphs ONLY if the mouse is located inside the area
-        # that draws at the time.
-        if (self.mouse_cursor_inside and self.auto_hide and
-                context.area.type == "VIEW_3D" and
-                context.region.type == "WINDOW") or not self.auto_hide:
-            self.draw_area_context = context
-            for child in self.children:
-                child.draw(self.draw_area_context)
-                # context.area.tag_redraw()
-        else:
-            # If it is not, reset the information about the region back
-            # to previous region as the active region.
-            if draw_area_old is not None:
-                mybuffer = draw_area_old
+            # If auto_hide is enabled, draw my Morphs ONLY if the mouse is located inside the area
+            # that draws at the time.
+            if (self.mouse_cursor_inside and
+                self.auto_hide and context.area.type == "VIEW_3D" and
+                    context.region.type == "WINDOW") or not self.auto_hide:
+                self.draw_area_context = context
                 self.draw_area = mybuffer
+
+                # from that extract information about the region and
+                # assign it to relevant instance variables
                 self.draw_area_position = [mybuffer[0], mybuffer[1]]
                 self.draw_area_width = mybuffer[2]
                 self.draw_area_height = mybuffer[3]
+
+                self.mouse_position = [
+                    self.mouse_position_absolute[0] - self.draw_area[0],
+                    self.mouse_position_absolute[1] - self.draw_area[1]]
+                for child in self.children:
+                    child.draw(self.draw_area_context)
+                    # context.area.tag_redraw()
 
     def add_morph(self, morph):
         """
@@ -733,14 +847,15 @@ class World(Morph):
         if context.region is None:
             return
 
-        x1 = context.region.x
-        y1 = context.region.y
-        self.window_position = (x1, y1)
-        x2 = context.region.width
-        y2 = context.region.height
-        self.window_width = x2
-        self.window_height = y2
-        self.mouse_position = [event.mouse_region_x, event.mouse_region_y]
+        bmx = context.region.x
+        bmy = context.region.y
+        self.window_position = (bmx, bmy)
+
+        self.window_width = context.region.width
+        self.window_height = context.region.height
+
+        self.mouse_position_absolute = [
+            event.mouse_region_x + self.window_position[0], event.mouse_region_y + self.window_position[1]]
         self.event = event
 
         # consumed_event is reset so World does not block events that are not handled by it.
