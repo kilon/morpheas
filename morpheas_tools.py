@@ -103,3 +103,11 @@ def roundCorners(x1, y1, x2, y2, value, steps, corners=[True, True, True, True])
         verts.append((x2, y1))
 
     return verts
+
+
+def pointsDistance(point1x, point1y, point2x, point2y):
+    """
+    Given two points on the plane, return their distance.
+    """
+    distance = math.sqrt(((point1x-point2x)**2)+((point1y-point2y)**2))
+    return distance

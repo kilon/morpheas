@@ -56,6 +56,7 @@ import blf
 from bgl import *
 from . import morpheas_tools
 import pdb
+import math
 
 
 class Morph:
@@ -80,7 +81,8 @@ class Morph:
             on_right_click_action=None, on_right_click_released_action=None,
             on_mouse_in_action=None, on_mouse_out_action=None,
             texture_path=None, scale=0.5, round_corners=False,
-            round_corners_strength=10, round_corners_select=[True, True, True, True]):
+            round_corners_strength=10, round_corners_select=[True, True, True, True],
+            drag_drop=False, circle=False):
         """
         This is responsible for the creation of the morph, each keyword argument
         is associated with an instance variable so see the comment of the relevant
@@ -106,7 +108,7 @@ class Morph:
         self.handles_mouse_down = False
         self.handles_events = False
         self.handles_mouse_over = False
-        self.handles_drag_drop = False
+        self.handles_drag_drop = drag_drop
 
         self._is_hidden = False
 
@@ -151,6 +153,8 @@ class Morph:
         # to round all of them.
         self.round_corners_select = round_corners_select
 
+        self.circle = circle
+
         # This is the path to the textures.
         if texture_path is None:
             self.texture_path = Morph.texture_path
@@ -159,7 +163,7 @@ class Morph:
 
         # Drag and drop flag.
         self.drag_drop = False
-        self.drag_position = []
+        self.drag_position = [0, 0]
 
         # Active texture is the texture displaying at the time.
         # Only one texture can display at a time for each morph,
@@ -298,6 +302,23 @@ class Morph:
         """
         Return true if mouse is over morph.
         """
+        # If morph is a circle, conventional bounds don't work, need to
+        # get the distance of the cursor position from the center of the
+        # circle morph and compare it with its radius.
+        if self.circle:
+            ex = self.world.mouse_position_absolute[0]
+            ey = self.world.mouse_position_absolute[1]
+
+            position_x = self.get_absolute_position()[0]
+            position_y = self.get_absolute_position()[1]
+
+            circleR = float(self._width / 2)
+            circleCenter = [position_x +
+                            circleR, position_y + circleR]
+            result = morpheas_tools.pointsDistance(
+                circleCenter[0], circleCenter[1], ex, ey) <= circleR
+            return result
+
         apx1 = self.get_absolute_position()[0]
         apy1 = self.get_absolute_position()[1]
         apx2 = self.get_absolute_position()[0] + self.width
@@ -385,24 +406,54 @@ class Morph:
 
             glColor4f(*self.color)
 
-            # Draw a simple rectangle with the dimensions, position and scale of the Morph.
-            # Use the active texture as texture of the rectangle.
-            glEnable(GL_BLEND)
-            glEnable(GL_TEXTURE_2D)
-            glBegin(GL_QUADS)
-            glTexCoord2f(0, 0)
-            glVertex2f(position_x, position_y)
-            glTexCoord2f(1, 0)
-            glVertex2f((position_x + self.width), position_y)
-            glTexCoord2f(1, 1)
-            glVertex2f(
-                (position_x + self.width),
-                (position_y + self.height))
-            glTexCoord2f(0, 1)
-            glVertex2f(position_x, (position_y + self.height))
+            # If there is a texture and circle is enabled, create a circle and
+            # apply the texture to it.
+            if self.circle:
+                glEnable(GL_BLEND)
+                glEnable(GL_TEXTURE_2D)
+                glBegin(GL_TRIANGLE_FAN)
 
-            # Restore OpenGL context to avoide any conflicts.
-            glEnd()
+                angle = 0.0
+
+                # Circle radius and center.
+                circleR = float(self._width / 2)
+                circleCenter = [position_x +
+                                circleR, position_y + circleR]
+
+                while angle < 360.0:
+                    radian = angle * (math.pi / 180.0)
+                    xcos = float(math.cos(radian))
+                    ysin = float(math.sin(radian))
+                    x = xcos * circleR + circleCenter[0]
+                    y = ysin * circleR + circleCenter[1]
+                    tx = xcos * 0.5 + 0.5
+                    ty = ysin * 0.5 + 0.5
+                    glTexCoord2f(tx, ty)
+                    glVertex2f(x, y)
+
+                    angle += 1.0
+
+                glEnd()
+            else:
+                # Draw a simple rectangle with the dimensions, position and scale of the Morph.
+                # Use the active texture as texture of the rectangle.
+                glEnable(GL_BLEND)
+                glEnable(GL_TEXTURE_2D)
+                glBegin(GL_QUADS)
+                glTexCoord2f(0, 0)
+                glVertex2f(position_x, position_y)
+                glTexCoord2f(1, 0)
+                glVertex2f((position_x + self.width), position_y)
+                glTexCoord2f(1, 1)
+                glVertex2f(
+                    (position_x + self.width),
+                    (position_y + self.height))
+                glTexCoord2f(0, 1)
+                glVertex2f(position_x, (position_y + self.height))
+
+                # Restore OpenGL context to avoide any conflicts.
+                glEnd()
+
             glDisable(GL_TEXTURE_2D)
             glDisable(GL_BLEND)
 
@@ -416,6 +467,27 @@ class Morph:
                     self.width, position_y + self.height,
                     self.round_corners_strength,
                     self.round_corners_strength, self.round_corners_select)
+                morpheas_tools.drawRegion('GL_POLYGON', outline, self.color)
+            elif self.circle:
+                angle = 0.0
+
+                points = []
+
+                circleR = float(self._width / 2)
+                circleCenter = [position_x +
+                                circleR, position_y + circleR]
+
+                while angle < 360.0:
+                    radian = angle * (math.pi / 180.0)
+                    xcos = float(math.cos(radian))
+                    ysin = float(math.sin(radian))
+                    x = xcos * circleR + circleCenter[0]
+                    y = ysin * circleR + circleCenter[1]
+                    new_point = [x, y]
+                    points.append(new_point)
+
+                    angle += 1.0
+                morpheas_tools.drawRegion('GL_POLYGON', points, self.color)
             else:
                 outline = morpheas_tools.roundCorners(
                     position_x, position_y,
@@ -423,7 +495,7 @@ class Morph:
                     self.width, position_y + self.height,
                     10, 10, [False, False, False, False])
 
-            morpheas_tools.drawRegion('GL_POLYGON', outline, self.color)
+                morpheas_tools.drawRegion('GL_POLYGON', outline, self.color)
 
         # If morph is not hidden, also draw all its children.
         if (not self.is_hidden) and len(self.children) > 0:
@@ -635,8 +707,6 @@ class Morph:
         if self.mouse_over_morph:
             return self.on_mouse_in()
         else:
-            if self.drag_drop:
-                self.drag_drop = False
             return self.on_mouse_out()
 
     # The following methods should be self explanatory and
@@ -648,7 +718,7 @@ class Morph:
         if self.on_left_click_action is not None:
             return self.on_left_click_action.on_left_click(self)
         else:
-            if not self.drag_drop:
+            if not self.drag_drop and self.handles_drag_drop:
                 self.drag_drop = True
                 self.drag_position = self.world.mouse_position
             return self.world.event
@@ -657,7 +727,7 @@ class Morph:
         if self.on_left_click_released_action is not None:
             return self.on_left_click_released_action.on_left_click_released(self)
         else:
-            if self.drag_drop:
+            if self.drag_drop and self.handles_drag_drop:
                 self.drag_drop = False
             return self.world.event
 
