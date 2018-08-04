@@ -700,9 +700,17 @@ class Morph:
             offset = [
                 self.world.mouse_position[0] - self.drag_position[0],
                 self.world.mouse_position[1] - self.drag_position[1]]
-            self.position = [
-                self.position[0] +
-                offset[0], self.position[1] + offset[1]]
+
+            viewport_width = bpy.context.area.regions[4].width
+            viewport_height = bpy.context.area.regions[4].height
+            positionX = max(
+                min(viewport_width - self._width, self.position[0] + offset[0]), 0)
+            positionY = max(
+                min(viewport_height - self._height, self.position[1] + offset[1]), 0)
+            self.position = [positionX, positionY]
+            # self.position = [
+            #     self.position[0] +
+            #     offset[0], self.position[1] + offset[1]]
             self.drag_position = self.world.mouse_position
         if self.mouse_over_morph:
             return self.on_mouse_in()
@@ -851,7 +859,15 @@ class World(Morph):
         return [self.position[0] + self.draw_area_position[0],
                 self.position[1] + self.draw_area_position[1]]
 
-    # World draw depends on Morph draw, what it does additionally is the auto_hide feature
+    def disable_all_drag_drop(self, morph):
+        """
+        With a morph given(the world), recursively disable all drag_drops.
+        """
+        for child in morph.children:
+            child.drag_drop = False
+            self.disable_all_drag_drop(child)
+
+        # World draw depends on Morph draw, what it does additionally is the auto_hide feature
     def draw(self, context):
         self.draw_area_context = context
         if self.event is not None:
@@ -865,6 +881,10 @@ class World(Morph):
             self.mouse_cursor_inside = (
                 (mabx > mybuffer[0]) and (mabx < (mybuffer[0] + mybuffer[2])) and (
                     maby > mybuffer[1]) and (maby < (mybuffer[1] + mybuffer[3])))
+
+            # When cursor is outside the area that draws, disable all drag_drops.
+            if not self.mouse_cursor_inside:
+                self.disable_all_drag_drop(self)
 
             # If auto_hide is enabled, draw my Morphs ONLY if the mouse is located inside the area
             # that draws at the time.
