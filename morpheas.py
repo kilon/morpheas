@@ -80,7 +80,7 @@ class Morph:
             on_left_click_action=None, on_left_click_released_action=None,
             on_right_click_action=None, on_right_click_released_action=None,
             on_mouse_in_action=None, on_mouse_out_action=None,
-            texture_path=None, scale=0.5, round_corners=False,
+            texture_path=None, scale=1.0, round_corners=False,
             round_corners_strength=10, round_corners_select=[True, True, True, True],
             drag_drop=False, circle=False):
         """
@@ -90,9 +90,15 @@ class Morph:
         """
 
         # If you need explanation for this, I'm worried about you.
-        self._width = width
-        self._height = height
-        self._position = position
+        self.real_width = width
+        self.real_height = height
+        self.real_position = position
+
+        self._width = self.real_width * scale
+        self._height = self.real_height * scale
+        self._position = [
+            self.real_position[0],
+            self.real_position[1]]
 
         # If no texture is defined, then this is the color of the morph.
         # Else, this affects the color and transparency of the texture.
@@ -215,10 +221,10 @@ class Morph:
         """
         Return the width of the morph.
         """
-        if self._width < 0:
+        if self.real_width < 0:
             raise ValueError("width must not be a negative value")
         else:
-            return self._width
+            return self.real_width
 
     @width.setter
     def width(self, value):
@@ -228,7 +234,8 @@ class Morph:
         if value < 0:
             raise ValueError("new value for width must be a positive number")
         else:
-            self._width = value
+            self.real_width = value
+            self._width = value * self.get_absolute_scale()
 
     @property
     def height(self):
@@ -238,7 +245,7 @@ class Morph:
         if self._height < 0:
             raise ValueError("height must not be a negative value ")
         else:
-            return self._height
+            return self.real_height
 
     @height.setter
     def height(self, value):
@@ -248,21 +255,24 @@ class Morph:
         if value < 0:
             raise ValueError("new value for width must be a positive number")
         else:
-            self._height = value
+            self.real_height = value
+            self._height = value * self.get_absolute_scale()
 
     @property
     def position(self):
         """
         Return the position of the morph.
         """
-        return self._position
+        return self.real_position
 
     @position.setter
     def position(self, value):
         """
         Change the position of the morph.
         """
-        self._position = value
+        self.real_position = value
+        self._position = [value[0] * self.get_absolute_scale(),
+                          value[1] * self.get_absolute_scale()]
 
     @property
     def world_position(self):
@@ -335,7 +345,7 @@ class Morph:
     # without the extension
     # scale: it allows to scale the texture
     # 1 being texture at full size
-    def load_texture(self, name, scale=0.5):
+    def load_texture(self, name, scale=1.0):
         """
         This is an internal method not to be used directly by the user.
         It loads the texture, while the actual displaying is handled by the
@@ -376,10 +386,19 @@ class Morph:
         """
         The main draw function. Kind of a nightmare to figure out...
         """
+        self._width = self.real_width * self.get_absolute_scale()
+        self._height = self.real_height * self.get_absolute_scale()
+        if self.parent == self.world:
+            self._position = self.real_position
+        else:
+            self._position = [self.real_position[0] * self.get_absolute_scale(),
+                              self.real_position[1] * self.get_absolute_scale()]
         position_x = self.get_absolute_position(
         )[0] - self.world.draw_area_position[0]
         position_y = self.get_absolute_position(
         )[1] - self.world.draw_area_position[1]
+        width = self._width
+        height = self._height
 
         # If the morph is not hidden and a texture is given.
         if (not self.is_hidden) and (not len(self.textures) == 0):
@@ -416,7 +435,7 @@ class Morph:
                 angle = 0.0
 
                 # Circle radius and center.
-                circleR = float(self._width / 2)
+                circleR = float(width / 2)
                 circleCenter = [position_x +
                                 circleR, position_y + circleR]
 
@@ -443,13 +462,13 @@ class Morph:
                 glTexCoord2f(0, 0)
                 glVertex2f(position_x, position_y)
                 glTexCoord2f(1, 0)
-                glVertex2f((position_x + self.width), position_y)
+                glVertex2f((position_x + width), position_y)
                 glTexCoord2f(1, 1)
                 glVertex2f(
-                    (position_x + self.width),
-                    (position_y + self.height))
+                    (position_x + width),
+                    (position_y + height))
                 glTexCoord2f(0, 1)
-                glVertex2f(position_x, (position_y + self.height))
+                glVertex2f(position_x, (position_y + height))
 
                 # Restore OpenGL context to avoide any conflicts.
                 glEnd()
@@ -464,7 +483,7 @@ class Morph:
                 outline = morpheas_tools.roundCorners(
                     position_x, position_y,
                     position_x +
-                    self.width, position_y + self.height,
+                    width, position_y + height,
                     self.round_corners_strength,
                     self.round_corners_strength, self.round_corners_select)
                 morpheas_tools.drawRegion('GL_POLYGON', outline, self.color)
@@ -473,7 +492,7 @@ class Morph:
 
                 points = []
 
-                circleR = float(self._width / 2)
+                circleR = float(width / 2)
                 circleCenter = [position_x +
                                 circleR, position_y + circleR]
 
@@ -492,7 +511,7 @@ class Morph:
                 outline = morpheas_tools.roundCorners(
                     position_x, position_y,
                     position_x +
-                    self.width, position_y + self.height,
+                    width, position_y + height,
                     10, 10, [False, False, False, False])
 
                 morpheas_tools.drawRegion('GL_POLYGON', outline, self.color)
@@ -582,11 +601,20 @@ class Morph:
         parents did not work...
         """
         if self.parent is not None:
-            return (self.parent.get_absolute_position()[0] + self.position[0],
-                    self.parent.get_absolute_position()[1] + self.position[1])
+            return (self.parent.get_absolute_position()[0] + self._position[0],
+                    self.parent.get_absolute_position()[1] + self._position[1])
 
         else:
-            return self.position
+            return self._position
+
+    def get_absolute_scale(self):
+        """
+        Goes through all the parents and combines their scaling.
+        """
+        if self.parent is not None:
+            return self.scale * self.parent.get_absolute_scale()
+        else:
+            return self.scale
 
     def add_morph(self, morph):
         """
@@ -967,7 +995,7 @@ class TextMorph(Morph):
     """
 
     def __init__(self, font_id=0, text="empty string", x=15, y=0, size=16, dpi=72, **kargs):
-        self.position = [x, y]
+        self.real_position = [x, y]
         super().__init__(texture=None, **kargs)
         self.size = size
         self.dpi = dpi
