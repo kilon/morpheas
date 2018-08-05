@@ -729,8 +729,13 @@ class Morph:
                 self.world.mouse_position[0] - self.drag_position[0],
                 self.world.mouse_position[1] - self.drag_position[1]]
 
-            viewport_width = bpy.context.area.regions[4].width
-            viewport_height = bpy.context.area.regions[4].height
+            try:
+                viewport_width = bpy.context.area.regions[4].width
+                viewport_height = bpy.context.area.regions[4].height
+            except:
+                viewport_width = 100
+                viewport_height = 100
+
             positionX = max(
                 min(viewport_width - self._width, self.position[0] + offset[0]), 0)
             positionY = max(
