@@ -111,3 +111,13 @@ def pointsDistance(point1x, point1y, point2x, point2y):
     """
     distance = math.sqrt(((point1x-point2x)**2)+((point1y-point2y)**2))
     return distance
+
+
+def collisionDetect(x1, y1, x2, y2, w1, h1, w2, h2):
+    """
+    Given x and y of two rectangles and their width and height detect if
+    they collide.
+    """
+    if x1 > x2 and x1 < x2 + w2 or x1 + w1 > x2 and x1 + w1 < x2 + w2:
+        if y1 > y2 and y1 < y2 + h2 or y1 + h1 > y2 and y1 + h1 < y2 + h2:
+            return True

@@ -226,6 +226,16 @@ class Morph:
         else:
             return self.real_width
 
+    @property
+    def width_scaled(self):
+        """
+        Return the scaled width of the morph.
+        """
+        if self._width < 0:
+            raise ValueError("width must not be a negative value")
+        else:
+            return self._width
+
     @width.setter
     def width(self, value):
         """
@@ -247,6 +257,16 @@ class Morph:
         else:
             return self.real_height
 
+    @property
+    def height_scaled(self):
+        """
+        Return the scaled height of the morph.
+        """
+        if self._height < 0:
+            raise ValueError("height must not be a negative value ")
+        else:
+            return self._height
+
     @height.setter
     def height(self, value):
         """
@@ -264,6 +284,14 @@ class Morph:
         Return the position of the morph.
         """
         return self.real_position
+
+    @property
+    def position_scaled(self):
+        """
+        Return the scaled position of the morph.
+        """
+        return [self.real_position[0] * self.get_absolute_scale(),
+                self.real_position[1] * self.get_absolute_scale()]
 
     @position.setter
     def position(self, value):
@@ -725,6 +753,8 @@ class Morph:
         Αn event when the mouse cursor passes over the area occupied by the morph.
         """
         if self.drag_drop:
+            cancel_drag = False
+
             offset = [
                 self.world.mouse_position[0] - self.drag_position[0],
                 self.world.mouse_position[1] - self.drag_position[1]]
@@ -740,11 +770,21 @@ class Morph:
                 min(viewport_width - self._width, self.position[0] + offset[0]), 0)
             positionY = max(
                 min(viewport_height - self._height, self.position[1] + offset[1]), 0)
-            self.position = [positionX, positionY]
-            # self.position = [
-            #     self.position[0] +
-            #     offset[0], self.position[1] + offset[1]]
-            self.drag_position = self.world.mouse_position
+
+            for bigMorph in self.world.children:
+                if bigMorph.name != self.name and bigMorph.is_hidden is False \
+                    and morpheas_tools.collisionDetect(
+                        positionX, positionY, bigMorph.position_scaled[0],
+                        bigMorph.position_scaled[1], self.width_scaled, self.height_scaled,
+                        bigMorph.width_scaled, bigMorph.height_scaled):
+                    cancel_drag = True
+
+            if cancel_drag is False:
+                self.position = [positionX, positionY]
+                # self.position = [
+                #     self.position[0] +
+                #     offset[0], self.position[1] + offset[1]]
+                self.drag_position = self.world.mouse_position
         if self.mouse_over_morph:
             return self.on_mouse_in()
         else:
