@@ -4,28 +4,25 @@ Some necessary functions for Morpheas to work correctly.
 
 import math
 import bpy
-import bgl
-import blf
+import gpu
+from gpu_extras.batch import batch_for_shader
 import bpy_extras
 
 
-def drawRegion(mode, points, color):
+def drawRegion(points, color):
     """
     Draw a simple shape with given points and color.
     """
+    shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
 
-    bgl.glColor4f(color[0], color[1], color[2], color[3])
-    if mode == 'GL_LINE_LOOP':
-        bgl.glBegin(bgl.GL_LINE_LOOP)
-    else:
-        bgl.glEnable(bgl.GL_BLEND)
-        bgl.glBegin(bgl.GL_POLYGON)
+    # indices = [(i, i+1, i+2) for i in range(0, len(points)-2)]
 
-    # start with corner right-bottom
-    for point in points:
-        bgl.glVertex2f(point[0], point[1])
+    batch = batch_for_shader(
+        shader, 'TRI_FAN', {"pos": points})
 
-    bgl.glEnd()
+    shader.bind()
+    shader.uniform_float("color", color)
+    batch.draw(shader)
 
 
 def drawArc(cx, cy, r, startAngle, arcAngle, numSegments):

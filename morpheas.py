@@ -53,7 +53,9 @@ classes for this library to work.
 
 import bpy
 import blf
-from bgl import *
+import bgl
+import gpu
+from gpu_extras.batch import batch_for_shader
 from . import morpheas_tools
 import pdb
 import math
@@ -388,15 +390,11 @@ class Morph:
         full_path = self.texture_path + name
         self.image = bpy.data.images.load(full_path)
 
-        content = list(self.image.pixels)
-        buf = Buffer(
-            GL_FLOAT, self.image.size[0] * self.image.size[1] * 4, content)
-
         # A Morph can have multiple textures if it is needed, the information
         # about those textures are fetched directly from the PNG file.
         self.textures[name] = {
             'dimensions': [self.image.size[0], self.image.size[1]],
-            'full_path': full_path, 'data': buf,
+            'full_path': full_path, 'image': self.image,
             'is_gl_initialised': False, 'scale': scale, 'texture_id': 0}
 
         self.activate_texture(name)
@@ -428,37 +426,26 @@ class Morph:
         width = self._width
         height = self._height
 
+        bgl.glEnable(bgl.GL_BLEND)
+
         # If the morph is not hidden and a texture is given.
         if (not self.is_hidden) and (not len(self.textures) == 0):
             self.draw_count = self.draw_count + 1
 
             at = self.textures[self.active_texture]
 
-            # Load the active texture to the OpenGL context.
-            if not at['is_gl_initialised']:
-                at['texture_id'] = Buffer(GL_INT, [1])
-                glGenTextures(1, at['texture_id'])
-                glBindTexture(GL_TEXTURE_2D, at['texture_id'].to_list()[0])
-                glTexImage2D(
-                    GL_TEXTURE_2D, 0, GL_RGBA,
-                    at['dimensions'][0], at['dimensions'][1], 0, GL_RGBA, GL_FLOAT,
-                    at['data'])
-                glTexParameteri(
-                    GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-                glTexParameteri(
-                    GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-                at['is_gl_initialised'] = True
-            else:
-                glBindTexture(GL_TEXTURE_2D, at['texture_id'].to_list()[0])
+            image = at['image']
 
-            glColor4f(*self.color)
+            shader = gpu.shader.from_builtin('2D_IMAGE')
+
+            if image.gl_load():
+                raise Exception()
 
             # If there is a texture and circle is enabled, create a circle and
             # apply the texture to it.
             if self.circle:
-                glEnable(GL_BLEND)
-                glEnable(GL_TEXTURE_2D)
-                glBegin(GL_TRIANGLE_FAN)
+                pos = []
+                texCoord = []
 
                 angle = 0.0
 
@@ -475,34 +462,36 @@ class Morph:
                     y = ysin * circleR + circleCenter[1]
                     tx = xcos * 0.5 + 0.5
                     ty = ysin * 0.5 + 0.5
-                    glTexCoord2f(tx, ty)
-                    glVertex2f(x, y)
+                    texCoord.append((tx, ty))
+                    pos.append((x, y))
 
                     angle += 1.0
 
-                glEnd()
             else:
                 # Draw a simple rectangle with the dimensions, position and scale of the Morph.
                 # Use the active texture as texture of the rectangle.
-                glEnable(GL_BLEND)
-                glEnable(GL_TEXTURE_2D)
-                glBegin(GL_QUADS)
-                glTexCoord2f(0, 0)
-                glVertex2f(position_x, position_y)
-                glTexCoord2f(1, 0)
-                glVertex2f((position_x + width), position_y)
-                glTexCoord2f(1, 1)
-                glVertex2f(
-                    (position_x + width),
-                    (position_y + height))
-                glTexCoord2f(0, 1)
-                glVertex2f(position_x, (position_y + height))
+                pos = [
+                    (position_x, position_y),
+                    ((position_x + width), position_y),
+                    ((position_x + width), (position_y + height)),
+                    (position_x, (position_y + height))
+                ]
+                texCoord = [
+                    (0, 0), (1, 0), (1, 1), (0, 1)
+                ]
 
-                # Restore OpenGL context to avoide any conflicts.
-                glEnd()
-
-            glDisable(GL_TEXTURE_2D)
-            glDisable(GL_BLEND)
+            batch = batch_for_shader(
+                shader, 'TRI_FAN',
+                {
+                    "pos": tuple(pos),
+                    "texCoord": tuple(texCoord),
+                },
+            )
+            bgl.glActiveTexture(bgl.GL_TEXTURE0)
+            bgl.glBindTexture(bgl.GL_TEXTURE_2D, image.bindcode)
+            shader.bind()
+            shader.uniform_int("image", 0)
+            batch.draw(shader)
 
         # If morph is not hidden and no texture is given, create a simple rectangle,
         # with the option to have rounded corners.
@@ -514,7 +503,7 @@ class Morph:
                     width, position_y + height,
                     self.round_corners_strength,
                     self.round_corners_strength, self.round_corners_select)
-                morpheas_tools.drawRegion('GL_POLYGON', outline, self.color)
+                morpheas_tools.drawRegion(outline, self.color)
             elif self.circle:
                 angle = 0.0
 
@@ -534,7 +523,7 @@ class Morph:
                     points.append(new_point)
 
                     angle += 1.0
-                morpheas_tools.drawRegion('GL_POLYGON', points, self.color)
+                morpheas_tools.drawRegion(points, self.color)
             else:
                 outline = morpheas_tools.roundCorners(
                     position_x, position_y,
@@ -542,7 +531,9 @@ class Morph:
                     width, position_y + height,
                     10, 10, [False, False, False, False])
 
-                morpheas_tools.drawRegion('GL_POLYGON', outline, self.color)
+                morpheas_tools.drawRegion(outline, self.color)
+
+        bgl.glDisable(bgl.GL_BLEND)
 
         # If morph is not hidden, also draw all its children.
         if (not self.is_hidden) and len(self.children) > 0:
@@ -945,12 +936,16 @@ class World(Morph):
         self.draw_area_context = context
         if self.event is not None:
             # Use OpenGL to get the size of the region we can draw without overlapping with other areas
-            mybuffer = Buffer(GL_INT, 4)
-            glGetIntegerv(GL_VIEWPORT, mybuffer)
+            mybuffer = bgl.Buffer(bgl.GL_INT, 4)
+            bgl.glGetIntegerv(bgl.GL_VIEWPORT, mybuffer)
             mx = self.event.mouse_region_x
             my = self.event.mouse_region_y
             mabx = self.mouse_position_absolute[0]
             maby = self.mouse_position_absolute[1]
+
+            mybuffer[0] = bpy.context.area.regions[4].x
+            mybuffer[1] = bpy.context.area.regions[4].y
+
             self.mouse_cursor_inside = (
                 (mabx > mybuffer[0]) and (mabx < (mybuffer[0] + mybuffer[2])) and (
                     maby > mybuffer[1]) and (maby < (mybuffer[1] + mybuffer[3])))
@@ -1053,7 +1048,10 @@ class TextMorph(Morph):
             )[0] - self.world.draw_area_position[0]
             position_y = self.get_absolute_position(
             )[1] - self.world.draw_area_position[1]
-            glColor4f(*self.color)
+            # blf.glColor4f(*self.color)
+            blf.color(
+                0, self.color[0], self.color[1],
+                self.color[2], self.color[3])
             blf.size(self.font_id, self.size, self.dpi)
             blf.position(self.font_id, position_x, position_y, 0)
             blf.draw(self.font_id, self.text)
